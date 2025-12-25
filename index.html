@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset='utf-8' />
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@6.1.10/index.global.min.js'></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<style>
+  body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; background-color: #f8fafc; overflow: hidden; }
+  
+  #smart-input-panel {
+    position: fixed; top: 20px; right: 20px; width: 320px; z-index: 9999;
+    background: #fff; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    border: 1px solid #e2e8f0; overflow: hidden;
+  }
+  #panel-header { background: #6366f1; color: white; padding: 10px 15px; cursor: move; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+  #panel-content { padding: 15px; }
+  #ai-text-input { width: 100%; height: 100px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; resize: vertical; margin-bottom: 10px; }
+  #parse-btn { background: #6366f1; color: white; border: none; width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  
+  #calendar { max-width: 100%; height: 100vh; background: #fff; padding: 10px; }
+  [data-resource-id="R5"] { border-right: 3px solid #000 !important; }
+  
+  /* 左側時間軸樣式 */
+  .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; }
+  .minute-label { font-size: 11px; color: #94a3b8; }
+
+  /* 🟢 課堂方塊內部樣式優化 */
+  .event-inner { padding: 2px; color: white; line-height: 1.2; }
+  .event-time { font-size: 10px; opacity: 0.9; margin-bottom: 2px; }
+  .event-title { font-size: 13px; font-weight: bold; display: block; }
+  .event-teacher { font-size: 11px; margin-top: 2px; display: flex; align-items: center; }
+</style>
+</head>
+<body>
+
+  <div id="smart-input-panel">
+    <div id="panel-header">
+      <span>雲端排課助手 (可移動)</span>
+      <button id="toggle-btn" style="cursor:pointer; background:none; border:none; color:white;">收起</button>
+    </div>
+    <div id="panel-content">
+      <textarea id="ai-text-input" placeholder="在此貼上訊息內容..."></textarea>
+      <button id="parse-btn">解析並同步至雲端</button>
+    </div>
+  </div>
+
+  <div id='calendar'></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
+      authDomain: "lckroomtable.firebaseapp.com",
+      databaseURL: "https://lckroomtable-default-rtdb.firebaseio.com",
+      projectId: "lckroomtable",
+      storageBucket: "lckroomtable.firebasestorage.app",
+      messagingSenderId: "934661729012",
+      appId: "1:934661729012:web:14b19af989cd72b2370ca1"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const eventRef = db.ref('bookings');
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var calendarEl = document.getElementById('calendar');
+      var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'resourceTimeGridWeek',
+        locale: 'zh-tw',
+        schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
+        datesAboveResources: true,
+        slotDuration: '00:15:00',
+        slotLabelInterval: '00:15:00',
+        slotMinTime: '08:00:00',
+        slotMaxTime: '22:00:00',
+        allDaySlot: false,
+        hiddenDays: [ 0 ],
+        selectable: true,
+        editable: true,
+
+        // 🔄 左側時間軸顯示
+        slotLabelContent: function(arg) {
+          let mins = arg.date.getMinutes();
+          if (mins === 0) {
+            let hour = arg.date.getHours();
+            let ampm = hour >= 12 ? '下午' : '上午';
+            let displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+            return { html: `<span class="hour-label">${ampm}${displayHour}時</span>` };
+          }
+          return { html: `<span class="minute-label">${mins}</span>` };
+        },
+
+        // 🟢 修正：恢復課堂方塊內的「時間」顯示
+        eventContent: function(arg) {
+          return { 
+            html: `<div class="event-inner">
+                    <div class="event-time">${arg.timeText}</div>
+                    <div class="event-title">${arg.event.title}</div>
+                    <div class="event-teacher">👤 ${arg.event.extendedProps.teacher || ''}</div>
+                   </div>` 
+          };
+        },
+
+        eventChange: () => updateToCloud(),
+        eventRemove: () => updateToCloud(),
+
+        select: function(info) {
+          var title = prompt('學生姓名：');
+          if (title) {
+            var teacher = prompt('導師姓名：', '以琳老師');
+            calendar.addEvent({
+              title: title, start: info.startStr, end: info.endStr,
+              resourceId: info.resource.id, extendedProps: { teacher: teacher || '以琳老師' },
+              backgroundColor: '#6366f1'
+            });
+            updateToCloud();
+          }
+          calendar.unselect();
+        },
+
+        eventClick: function(info) {
+          if (confirm('確定要刪除「' + info.event.title + '」嗎？')) {
+            info.event.remove();
+            updateToCloud();
+          }
+        },
+
+        resources: [
+          { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
+          { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
+        ]
+      });
+
+      eventRef.on('value', (snapshot) => {
+        const cloudEvents = snapshot.val() || [];
+        calendar.removeAllEvents();
+        calendar.addEventSource(cloudEvents);
+      });
+
+      function updateToCloud() {
+        const events = calendar.getEvents().map(e => ({
+          title: e.title, start: e.startStr, end: e.endStr,
+          resourceId: e.getResources()[0]?.id,
+          extendedProps: e.extendedProps,
+          backgroundColor: e.backgroundColor || '#6366f1'
+        }));
+        eventRef.set(events);
+      }
+
+      // AI 解析
+      document.getElementById('parse-btn').onclick = function() {
+        const text = document.getElementById('ai-text-input').value;
+        if (!text) return;
+
+        let nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
+        let name = nameMatch ? nameMatch[1] : text.split('\n')[0].substring(0, 3);
+        let teacher = "以琳老師";
+        const teacherMatch = text.match(/導師\s*[｜|:：]\s*([^\s\n]+)/);
+        if (teacherMatch) teacher = teacherMatch[1];
+
+        const dateMatches = text.match(/(\d{1,2})月(\d{1,2})日/g);
+        const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
+        
+        if (dateMatches && timeMatch) {
+          const startTime = timeMatch[1].replace('：', ':');
+          const endTime = timeMatch[2].replace('：', ':');
+          let currentYear = new Date().getFullYear();
+          let lastMonth = -1;
+
+          dateMatches.forEach(dateStr => {
+            const m = dateStr.match(/(\d{1,2})月(\d{1,2})日/);
+            let month = parseInt(m[1]);
+            let day = parseInt(m[2]);
+            if (lastMonth !== -1 && month < lastMonth) currentYear++;
+            lastMonth = month;
+
+            let rId = 'R5';
+            if (text.includes('大廳')) rId = 'R1';
+            else if (text.includes('細房')) rId = 'R2';
+            else if (text.includes('18')) rId = 'R3';
+            else if (text.includes('12')) rId = 'R4';
+
+            calendar.addEvent({
+              title: name,
+              start: `${currentYear}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${startTime.padStart(5,'0')}:00`,
+              end: `${currentYear}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${endTime.padStart(5,'0')}:00`,
+              resourceId: rId,
+              extendedProps: { teacher: teacher },
+              backgroundColor: '#6366f1'
+            });
+          });
+          updateToCloud();
+          document.getElementById('ai-text-input').value = "";
+        }
+      };
+
+      // 拖拽面板
+      const panel = document.getElementById('smart-input-panel');
+      const header = document.getElementById('panel-header');
+      const toggleBtn = document.getElementById('toggle-btn');
+      const content = document.getElementById('panel-content');
+      let isDragging = false; let offset = [0,0];
+
+      header.onmousedown = (e) => {
+        if(e.target === toggleBtn) return;
+        isDragging = true;
+        offset = [panel.offsetLeft - e.clientX, panel.offsetTop - e.clientY];
+      };
+      document.onmousemove = (e) => {
+        if (!isDragging) return;
+        panel.style.left = (e.clientX + offset[0]) + 'px';
+        panel.style.top = (e.clientY + offset[1]) + 'px';
+        panel.style.right = 'auto';
+      };
+      document.onmouseup = () => isDragging = false;
+      toggleBtn.onclick = () => {
+        content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        toggleBtn.innerText = content.style.display === 'none' ? '展開' : '收起';
+      };
+
+      calendar.render();
+    });
+  </script>
+</body>
+</html>
