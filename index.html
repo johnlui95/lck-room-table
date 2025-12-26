@@ -30,6 +30,20 @@
   .event-time { font-size: 10px; opacity: 0.9; margin-bottom: 2px; }
   .event-title { font-size: 13px; font-weight: bold; display: block; }
   .event-teacher { font-size: 11px; margin-top: 2px; display: flex; align-items: center; }
+  @media (max-width: 768px) {
+  #smart-input-panel {
+    width: 90%; /* 手機上讓面板寬一點好打字 */
+    right: 5%;
+    top: 10px;
+  }
+  .fc-header-toolbar {
+    flex-direction: column; /* 手機導覽列改為垂直排列 */
+    font-size: 12px;
+  }
+  .event-title {
+    font-size: 11px; /* 縮小文字避免擠壓 */
+  }
+}
 </style>
 </head>
 <body>
