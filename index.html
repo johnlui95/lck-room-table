@@ -76,6 +76,9 @@
     const db = firebase.database();
     const eventRef = db.ref('bookings');
 
+    // 🟢 關鍵：將 copiedEvent 放在這裡，讓所有函數都能讀取它
+    let copiedEvent = null;
+    
     document.addEventListener('DOMContentLoaded', function() {
       var calendarEl = document.getElementById('calendar');
       var calendar = new FullCalendar.Calendar(calendarEl, {
@@ -129,26 +132,74 @@ buttonText: {
         eventChange: () => updateToCloud(),
         eventRemove: () => updateToCloud(),
 
-        select: function(info) {
-          var title = prompt('學生姓名：');
-          if (title) {
-            var teacher = prompt('導師姓名：', '以琳老師');
-            calendar.addEvent({
-              title: title, start: info.startStr, end: info.endStr,
-              resourceId: info.resource.id, extendedProps: { teacher: teacher || '以琳老師' },
-              backgroundColor: '#6366f1'
-            });
-            updateToCloud();
-          }
-          calendar.unselect();
-        },
+// --- 修改 select: 支援新增與貼上 ---
+select: function(info) {
+  let title = "";
+  
+  if (copiedEvent) {
+    const usePaste = confirm('檢測到已複製的課堂：「' + copiedEvent.title + '」\n是否要貼上到此處？');
+    if (usePaste) {
+      calendar.addEvent({
+        title: copiedEvent.title,
+        start: info.startStr,
+        // 根據複製的長度計算結束時間，若無則使用選取範圍
+        end: info.endStr, 
+        resourceId: info.resource.id,
+        extendedProps: copiedEvent.extendedProps,
+        backgroundColor: copiedEvent.backgroundColor
+      });
+      updateToCloud();
+      calendar.unselect();
+      return;
+    }
+  }
 
-        eventClick: function(info) {
-          if (confirm('確定要刪除「' + info.event.title + '」嗎？')) {
-            info.event.remove();
-            updateToCloud();
-          }
-        },
+  // 若不使用貼上，則執行原本的新增邏輯
+  title = prompt('學生姓名：');
+  if (title) {
+    var teacher = prompt('導師姓名：', '以琳老師');
+    calendar.addEvent({
+      title: title, start: info.startStr, end: info.endStr,
+      resourceId: info.resource.id, 
+      extendedProps: { teacher: teacher || '以琳老師' },
+      backgroundColor: '#6366f1'
+    });
+    updateToCloud();
+  }
+  calendar.unselect();
+},
+// --- 修改 eventClick: 支援修改與複製 ---
+eventClick: function(info) {
+  const action = prompt('請輸入操作：\n1. 修改姓名\n2. 修改老師\n3. 複製課堂\n4. 刪除課堂', '1');
+  
+  if (action === '1') {
+    const newName = prompt('請輸入新的學生姓名：', info.event.title);
+    if (newName) {
+      info.event.setProp('title', newName);
+      updateToCloud();
+    }
+  } else if (action === '2') {
+    const newTeacher = prompt('請輸入新的導師姓名：', info.event.extendedProps.teacher);
+    if (newTeacher) {
+      info.event.setExtendedProp('teacher', newTeacher);
+      updateToCloud();
+    }
+  } else if (action === '3') {
+    // 複製課堂資訊
+    copiedEvent = {
+      title: info.event.title,
+      extendedProps: info.event.extendedProps,
+      backgroundColor: info.event.backgroundColor,
+      duration: info.event.end - info.event.start // 保持原本課堂長度
+    };
+    alert('已複製「' + info.event.title + '」，請點擊其他空白處貼上。');
+  } else if (action === '4') {
+    if (confirm('確定要刪除「' + info.event.title + '」嗎？')) {
+      info.event.remove();
+      updateToCloud();
+    }
+  }
+},
 
         resources: [
           { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
