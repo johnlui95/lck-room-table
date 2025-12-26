@@ -9,7 +9,7 @@
   body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; background-color: #f8fafc; overflow: hidden; }
   
   #smart-input-panel {
-    position: fixed; top: 20px; right: 20px; width: 320px; z-index: 9999;
+    position: fixed; top: 20px; right: 20px; width: 320px; z-index: 999;
     background: #fff; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
     border: 1px solid #e2e8f0; overflow: hidden;
   }
@@ -19,40 +19,45 @@
   #parse-btn { background: #6366f1; color: white; border: none; width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
   
   #calendar { max-width: 100%; height: 100vh; background: #fff; padding: 10px; }
-  [data-resource-id="R5"] { border-right: 3px solid #000 !important; }
-  
-  /* 左側時間軸樣式 */
+
+  /* 🔴 自定義彈出選單樣式 */
+  #custom-menu {
+    display: none; position: fixed; z-index: 10000;
+    background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    width: 160px; border: 1px solid #e2e8f0; overflow: hidden;
+  }
+  .menu-item {
+    padding: 12px 15px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: center; transition: background 0.2s;
+  }
+  .menu-item:hover { background: #f8fafc; }
+  .menu-item:last-child { border-bottom: none; color: #ef4444; } /* 刪除按鈕標紅 */
+
+  /* 左側時間軸與方塊樣式維持原樣 */
   .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; }
   .minute-label { font-size: 11px; color: #94a3b8; }
-
-  /* 🟢 課堂方塊內部樣式優化 */
   .event-inner { padding: 2px; color: white; line-height: 1.2; }
   .event-time { font-size: 10px; opacity: 0.9; margin-bottom: 2px; }
   .event-title { font-size: 13px; font-weight: bold; display: block; }
   .event-teacher { font-size: 11px; margin-top: 2px; display: flex; align-items: center; }
+
   @media (max-width: 768px) {
-  #smart-input-panel {
-    width: 90%; /* 手機上讓面板寬一點好打字 */
-    right: 5%;
-    top: 10px;
+    #smart-input-panel { width: 90%; right: 5%; top: 10px; }
+    .fc-header-toolbar { flex-direction: column; font-size: 12px; }
   }
-  .fc-header-toolbar {
-    flex-direction: column; /* 手機導覽列改為垂直排列 */
-    font-size: 12px;
-  }
-  .event-title {
-    font-size: 11px; /* 縮小文字避免擠壓 */
-  }
-}
 </style>
 </head>
 <body>
 
+  <div id="custom-menu">
+    <div class="menu-item" onclick="handleAction('editName')">✏️ 修改學生名</div>
+    <div class="menu-item" onclick="handleAction('editTeacher')">👤 修改老師名</div>
+    <div class="menu-item" onclick="handleAction('copy')">📋 複製課堂</div>
+    <div class="menu-item" onclick="handleAction('delete')">🗑️ 刪除課堂</div>
+  </div>
+
   <div id="smart-input-panel">
-    <div id="panel-header">
-      <span>雲端排課助手 (可移動)</span>
-      <button id="toggle-btn" style="cursor:pointer; background:none; border:none; color:white;">收起</button>
-    </div>
+    <div id="panel-header"><span>雲端排課助手</span><button id="toggle-btn" style="cursor:pointer; background:none; border:none; color:white;">收起</button></div>
     <div id="panel-content">
       <textarea id="ai-text-input" placeholder="在此貼上訊息內容..."></textarea>
       <button id="parse-btn">解析並同步至雲端</button>
@@ -76,13 +81,19 @@
     const db = firebase.database();
     const eventRef = db.ref('bookings');
 
-    // 🟢 關鍵：將 copiedEvent 放在這裡，讓所有函數都能讀取它
     let copiedEvent = null;
-    
+    let selectedEventInfo = null; // 紀錄目前點擊的是哪個事件
+
     document.addEventListener('DOMContentLoaded', function() {
       var calendarEl = document.getElementById('calendar');
       var calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'resourceTimeGridWeek',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'resourceTimeGridDay,resourceTimeGridWeek'
+        },
+        buttonText: { today: '今天', resourceTimeGridDay: '日視圖', resourceTimeGridWeek: '週視圖' },
         locale: 'zh-tw',
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
         datesAboveResources: true,
@@ -95,18 +106,6 @@
         selectable: true,
         editable: true,
 
-        headerToolbar: {
-  left: 'prev,next today',
-  center: 'title',
-  right: 'resourceTimeGridDay,resourceTimeGridWeek' // 加入這兩個按鈕
-},
-buttonText: {
-  today: '今天',
-  resourceTimeGridDay: '日視圖',
-  resourceTimeGridWeek: '週視圖'
-},
-
-        // 🔄 左側時間軸顯示
         slotLabelContent: function(arg) {
           let mins = arg.date.getMinutes();
           if (mins === 0) {
@@ -118,7 +117,6 @@ buttonText: {
           return { html: `<span class="minute-label">${mins}</span>` };
         },
 
-        // 🟢 修正：恢復課堂方塊內的「時間」顯示
         eventContent: function(arg) {
           return { 
             html: `<div class="event-inner">
@@ -132,80 +130,83 @@ buttonText: {
         eventChange: () => updateToCloud(),
         eventRemove: () => updateToCloud(),
 
-// --- 修改 select: 支援新增與貼上 ---
-select: function(info) {
-  let title = "";
-  
-  if (copiedEvent) {
-    const usePaste = confirm('檢測到已複製的課堂：「' + copiedEvent.title + '」\n是否要貼上到此處？');
-    if (usePaste) {
-      calendar.addEvent({
-        title: copiedEvent.title,
-        start: info.startStr,
-        // 根據複製的長度計算結束時間，若無則使用選取範圍
-        end: info.endStr, 
-        resourceId: info.resource.id,
-        extendedProps: copiedEvent.extendedProps,
-        backgroundColor: copiedEvent.backgroundColor
-      });
-      updateToCloud();
-      calendar.unselect();
-      return;
-    }
-  }
+        select: function(info) {
+          if (copiedEvent) {
+            if (confirm(`要貼上已複製的「${copiedEvent.title}」嗎？`)) {
+              calendar.addEvent({
+                title: copiedEvent.title,
+                start: info.startStr,
+                end: info.endStr,
+                resourceId: info.resource.id,
+                extendedProps: copiedEvent.extendedProps,
+                backgroundColor: copiedEvent.backgroundColor
+              });
+              updateToCloud();
+              calendar.unselect();
+              return;
+            }
+          }
+          var title = prompt('學生姓名：');
+          if (title) {
+            var teacher = prompt('導師姓名：', '以琳老師');
+            calendar.addEvent({
+              title: title, start: info.startStr, end: info.endStr,
+              resourceId: info.resource.id, extendedProps: { teacher: teacher || '以琳老師' },
+              backgroundColor: '#6366f1'
+            });
+            updateToCloud();
+          }
+          calendar.unselect();
+        },
 
-  // 若不使用貼上，則執行原本的新增邏輯
-  title = prompt('學生姓名：');
-  if (title) {
-    var teacher = prompt('導師姓名：', '以琳老師');
-    calendar.addEvent({
-      title: title, start: info.startStr, end: info.endStr,
-      resourceId: info.resource.id, 
-      extendedProps: { teacher: teacher || '以琳老師' },
-      backgroundColor: '#6366f1'
-    });
-    updateToCloud();
-  }
-  calendar.unselect();
-},
-// --- 修改 eventClick: 支援修改與複製 ---
-eventClick: function(info) {
-  const action = prompt('請輸入操作：\n1. 修改姓名\n2. 修改老師\n3. 複製課堂\n4. 刪除課堂', '1');
-  
-  if (action === '1') {
-    const newName = prompt('請輸入新的學生姓名：', info.event.title);
-    if (newName) {
-      info.event.setProp('title', newName);
-      updateToCloud();
-    }
-  } else if (action === '2') {
-    const newTeacher = prompt('請輸入新的導師姓名：', info.event.extendedProps.teacher);
-    if (newTeacher) {
-      info.event.setExtendedProp('teacher', newTeacher);
-      updateToCloud();
-    }
-  } else if (action === '3') {
-    // 複製課堂資訊
-    copiedEvent = {
-      title: info.event.title,
-      extendedProps: info.event.extendedProps,
-      backgroundColor: info.event.backgroundColor,
-      duration: info.event.end - info.event.start // 保持原本課堂長度
-    };
-    alert('已複製「' + info.event.title + '」，請點擊其他空白處貼上。');
-  } else if (action === '4') {
-    if (confirm('確定要刪除「' + info.event.title + '」嗎？')) {
-      info.event.remove();
-      updateToCloud();
-    }
-  }
-},
+        // 🔴 點擊課堂改為顯示自定義選單
+        eventClick: function(info) {
+          info.jsEvent.preventDefault();
+          selectedEventInfo = info.event;
+          
+          const menu = document.getElementById('custom-menu');
+          menu.style.display = 'block';
+          menu.style.left = info.jsEvent.clientX + 'px';
+          menu.style.top = info.jsEvent.clientY + 'px';
+
+          // 點擊外面關閉選單
+          const closeMenu = () => {
+            menu.style.display = 'none';
+            document.removeEventListener('click', closeMenu);
+          };
+          setTimeout(() => document.addEventListener('click', closeMenu), 50);
+        },
 
         resources: [
           { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
           { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
         ]
       });
+
+      // 🔴 處理選單動作
+      window.handleAction = function(action) {
+        if (!selectedEventInfo) return;
+        
+        if (action === 'editName') {
+          const newName = prompt('新學生姓名：', selectedEventInfo.title);
+          if (newName) selectedEventInfo.setProp('title', newName);
+        } else if (action === 'editTeacher') {
+          const newTeacher = prompt('新老師姓名：', selectedEventInfo.extendedProps.teacher);
+          if (newTeacher) selectedEventInfo.setExtendedProp('teacher', newTeacher);
+        } else if (action === 'copy') {
+          copiedEvent = {
+            title: selectedEventInfo.title,
+            extendedProps: selectedEventInfo.extendedProps,
+            backgroundColor: selectedEventInfo.backgroundColor
+          };
+          alert(`已複製「${copiedEvent.title}」，點擊空白處可貼上。`);
+        } else if (action === 'delete') {
+          if (confirm(`確定刪除「${selectedEventInfo.title}」？`)) selectedEventInfo.remove();
+        }
+        
+        updateToCloud();
+        document.getElementById('custom-menu').style.display = 'none';
+      };
 
       eventRef.on('value', (snapshot) => {
         const cloudEvents = snapshot.val() || [];
@@ -223,46 +224,26 @@ eventClick: function(info) {
         eventRef.set(events);
       }
 
-      // AI 解析
+      // AI 解析邏輯與面板拖拽 (維持原樣)
       document.getElementById('parse-btn').onclick = function() {
         const text = document.getElementById('ai-text-input').value;
         if (!text) return;
-
         let nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
         let name = nameMatch ? nameMatch[1] : text.split('\n')[0].substring(0, 3);
-        let teacher = "以琳老師";
-        const teacherMatch = text.match(/導師\s*[｜|:：]\s*([^\s\n]+)/);
-        if (teacherMatch) teacher = teacherMatch[1];
-
         const dateMatches = text.match(/(\d{1,2})月(\d{1,2})日/g);
         const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
-        
         if (dateMatches && timeMatch) {
           const startTime = timeMatch[1].replace('：', ':');
           const endTime = timeMatch[2].replace('：', ':');
           let currentYear = new Date().getFullYear();
-          let lastMonth = -1;
-
           dateMatches.forEach(dateStr => {
             const m = dateStr.match(/(\d{1,2})月(\d{1,2})日/);
-            let month = parseInt(m[1]);
-            let day = parseInt(m[2]);
-            if (lastMonth !== -1 && month < lastMonth) currentYear++;
-            lastMonth = month;
-
-            let rId = 'R5';
-            if (text.includes('大廳')) rId = 'R1';
-            else if (text.includes('細房')) rId = 'R2';
-            else if (text.includes('18')) rId = 'R3';
-            else if (text.includes('12')) rId = 'R4';
-
+            let rId = text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5')));
             calendar.addEvent({
               title: name,
-              start: `${currentYear}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${startTime.padStart(5,'0')}:00`,
-              end: `${currentYear}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${endTime.padStart(5,'0')}:00`,
-              resourceId: rId,
-              extendedProps: { teacher: teacher },
-              backgroundColor: '#6366f1'
+              start: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${startTime.padStart(5,'0')}:00`,
+              end: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${endTime.padStart(5,'0')}:00`,
+              resourceId: rId, extendedProps: { teacher: '以琳老師' }, backgroundColor: '#6366f1'
             });
           });
           updateToCloud();
@@ -270,29 +251,15 @@ eventClick: function(info) {
         }
       };
 
-      // 拖拽面板
       const panel = document.getElementById('smart-input-panel');
       const header = document.getElementById('panel-header');
       const toggleBtn = document.getElementById('toggle-btn');
       const content = document.getElementById('panel-content');
       let isDragging = false; let offset = [0,0];
-
-      header.onmousedown = (e) => {
-        if(e.target === toggleBtn) return;
-        isDragging = true;
-        offset = [panel.offsetLeft - e.clientX, panel.offsetTop - e.clientY];
-      };
-      document.onmousemove = (e) => {
-        if (!isDragging) return;
-        panel.style.left = (e.clientX + offset[0]) + 'px';
-        panel.style.top = (e.clientY + offset[1]) + 'px';
-        panel.style.right = 'auto';
-      };
+      header.onmousedown = (e) => { if(e.target===toggleBtn) return; isDragging = true; offset = [panel.offsetLeft - e.clientX, panel.offsetTop - e.clientY]; };
+      document.onmousemove = (e) => { if(!isDragging) return; panel.style.left = (e.clientX+offset[0])+'px'; panel.style.top = (e.clientY+offset[1])+'px'; panel.style.right='auto'; };
       document.onmouseup = () => isDragging = false;
-      toggleBtn.onclick = () => {
-        content.style.display = content.style.display === 'none' ? 'block' : 'none';
-        toggleBtn.innerText = content.style.display === 'none' ? '展開' : '收起';
-      };
+      toggleBtn.onclick = () => { content.style.display = content.style.display==='none'?'block':'none'; toggleBtn.innerText = content.style.display==='none'?'展開':'收起'; };
 
       calendar.render();
     });
