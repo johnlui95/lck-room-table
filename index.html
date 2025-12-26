@@ -92,6 +92,17 @@
         selectable: true,
         editable: true,
 
+        headerToolbar: {
+  left: 'prev,next today',
+  center: 'title',
+  right: 'resourceTimeGridDay,resourceTimeGridWeek' // 加入這兩個按鈕
+},
+buttonText: {
+  today: '今天',
+  resourceTimeGridDay: '日視圖',
+  resourceTimeGridWeek: '週視圖'
+},
+
         // 🔄 左側時間軸顯示
         slotLabelContent: function(arg) {
           let mins = arg.date.getMinutes();
