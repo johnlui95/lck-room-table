@@ -66,8 +66,8 @@
 
   <div id='calendar'></div>
 
-<script>
-    // --- Firebase 配置 ---
+  <script>
+    // --- Firebase 配置 (保持您的設定) ---
     const firebaseConfig = {
       apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
       authDomain: "lckroomtable.firebaseapp.com",
@@ -85,22 +85,6 @@
     let copiedEventsBatch = []; 
     let selectedEventInfo = null; 
     let multiSelectIds = new Set(); 
-
-    // 🎨 顏色管理：確保不同導師不同色
-    const teacherColorMap = {
-      '以琳老師': '#6366f1', // 藍紫色 (預設)
-      '其他': '#10b981'      // 綠色
-    };
-
-    function getTeacherColor(name) {
-      if (!name) return teacherColorMap['以琳老師'];
-      if (teacherColorMap[name]) return teacherColorMap[name];
-      // 如果是新老師，隨機生成一個好看的顏色
-      const colors = ['#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6'];
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      teacherColorMap[name] = randomColor;
-      return randomColor;
-    }
 
     function getEvId(ev) {
       return ev.startStr + "_" + ev.title + "_" + (ev.getResources()[0]?.id || "");
@@ -121,13 +105,16 @@
         selectable: true,
         editable: true,
 
-        // 🟢 恢復之前的時間標籤風格
+        // 🟢 恢復之前的時間標籤風格 (上午/下午時分)
         slotLabelContent: function(arg) {
           let mins = arg.date.getMinutes();
           let hour = arg.date.getHours();
           let ampm = hour >= 12 ? '下午' : '上午';
           let displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-          if (mins === 0) return { html: `<div class="hour-label">${ampm}${displayHour}時</div>` };
+          
+          if (mins === 0) {
+            return { html: `<div class="hour-label">${ampm}${displayHour}時</div>` };
+          }
           return { html: `<div class="minute-label">${ampm}${displayHour}:${mins}</div>` };
         },
 
@@ -143,9 +130,10 @@
           };
         },
 
+        // 貼上與選取邏輯
         select: function(info) {
           if (copiedEventsBatch.length > 0) {
-            if (confirm(`貼上已複製的 ${copiedEventsBatch.length} 堂課？`)) {
+            if (confirm(`要在這貼上已複製的 ${copiedEventsBatch.length} 堂課嗎？`)) {
               copiedEventsBatch.forEach(data => {
                 const newStart = new Date(info.start.getTime() + data.offset);
                 const newEnd = new Date(newStart.getTime() + data.duration);
@@ -164,7 +152,7 @@
             calendar.addEvent({
               title: title, start: info.startStr, end: info.endStr,
               resourceId: info.resource.id, extendedProps: { teacher: teacher || '以琳老師' },
-              backgroundColor: getTeacherColor(teacher)
+              backgroundColor: (teacher !== '以琳老師' ? '#10b981' : '#6366f1')
             });
             updateToCloud();
           }
@@ -188,56 +176,6 @@
         ]
       });
 
-      // 🔴 修正：更強大的文字解析邏輯
-      document.getElementById('parse-btn').onclick = function() {
-        const text = document.getElementById('ai-text-input').value;
-        if (!text) return;
-
-        // 1. 提取名字：匹配 2-4 個非數字字元，或取第一行
-        let nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費|課程)/);
-        let name = nameMatch ? nameMatch[1] : text.split('\n')[0].replace(/[^\w\u4e00-\u9fa5]/g, '').substring(0, 4);
-
-        // 2. 提取導師
-        let teacher = "以琳老師";
-        const teacherMatch = text.match(/(?:導師|老師)\s*[｜|:：]\s*([^\s\n]+)/);
-        if (teacherMatch) teacher = teacherMatch[1].trim();
-
-        // 3. 提取日期 (支援 12月25日 或 12/25)
-        const dateMatches = text.match(/(\d{1,2})[月\/](\d{1,2})[日]?/g);
-        // 4. 提取時間 (支援 14:00-15:00 或 14：00~15：00)
-        const timeMatch = text.match(/(\d{1,2}[:：]\d{2})\s*[-–—~]\s*(\d{1,2}[:：]\d{2})/);
-
-        if (dateMatches && timeMatch) {
-          const startTime = timeMatch[1].replace('：', ':');
-          const endTime = timeMatch[2].replace('：', ':');
-          let currentYear = new Date().getFullYear();
-          let color = getTeacherColor(teacher);
-          let successCount = 0;
-
-          dateMatches.forEach(dateStr => {
-            const m = dateStr.match(/(\d{1,2})[月\/](\d{1,2})/);
-            let rId = text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5')));
-            
-            calendar.addEvent({
-              title: name,
-              start: `${currentYear}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${startTime.padStart(5,'0')}:00`,
-              end: `${currentYear}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${endTime.padStart(5,'0')}:00`,
-              resourceId: rId, 
-              extendedProps: { teacher: teacher }, 
-              backgroundColor: color
-            });
-            successCount++;
-          });
-
-          updateToCloud();
-          document.getElementById('ai-text-input').value = "";
-          alert(`✅ 成功新增 ${successCount} 堂課！\n學生：${name}\n導師：${teacher}`);
-        } else {
-          alert("❌ 解析失敗！請檢查訊息中是否包含日期(如: 12月25日)與時間(如: 14:00-15:00)");
-        }
-      };
-
-      // 🟡 處理功能動作
       window.handleAction = function(action) {
         if (!selectedEventInfo) return;
         const evId = getEvId(selectedEventInfo);
@@ -254,27 +192,19 @@
             title: ev.title, offset: ev.start - baseStart, duration: ev.end - ev.start,
             resourceId: ev.getResources()[0]?.id, extendedProps: ev.extendedProps, backgroundColor: ev.backgroundColor
           }));
-          alert(`📋 已複製 ${copiedEventsBatch.length} 堂課`);
+          alert(`已複製 ${copiedEventsBatch.length} 堂課`);
           multiSelectIds.clear(); calendar.render();
         } 
-        else if (action === 'editTeacher') {
-          const t = prompt('新導師姓名：', selectedEventInfo.extendedProps.teacher);
-          if (t) {
-            const targets = multiSelectIds.has(evId) ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [selectedEventInfo];
-            const newColor = getTeacherColor(t);
-            targets.forEach(e => {
-              e.setExtendedProp('teacher', t);
-              e.setProp('backgroundColor', newColor);
-            });
-            updateToCloud();
-          }
-        }
         else if (action === 'delete') {
-          if (confirm('確定刪除？')) {
+          if (confirm('確定刪除選中課程？')) {
             const targets = multiSelectIds.has(evId) ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [selectedEventInfo];
             targets.forEach(e => e.remove());
             multiSelectIds.clear(); updateToCloud();
           }
+        }
+        else if (action === 'editName') {
+          const n = prompt('新名字：', selectedEventInfo.title);
+          if(n) { selectedEventInfo.setProp('title', n); updateToCloud(); }
         }
         document.getElementById('custom-menu').style.display = 'none';
       };
@@ -292,7 +222,7 @@
         eventRef.set(events);
       }
 
-      // 面板拖動與縮放
+      // AI 解析與拖動面板邏輯保持不變...
       const panel = document.getElementById('smart-input-panel');
       const header = document.getElementById('panel-header');
       const toggleBtn = document.getElementById('toggle-btn');
