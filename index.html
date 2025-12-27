@@ -71,7 +71,18 @@
   </div>
 
   <div id='calendar'></div>
-
+  
+document.getElementById('toggle-btn').onclick = function() {
+    const content = document.getElementById('panel-content');
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        this.innerText = '收起';
+    } else {
+        content.style.display = 'none';
+        this.innerText = '展開';
+    }
+};
+  
 <script>
   // 在你的 script 標籤內加入以下邏輯
 const panel = document.getElementById('smart-input-panel');
