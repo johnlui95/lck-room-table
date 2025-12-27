@@ -8,7 +8,6 @@
 <style>
   body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; background-color: #f8fafc; overflow: hidden; }
   
-  /* 側邊面板樣式 */
   #smart-input-panel {
     position: fixed; top: 20px; right: 20px; width: 320px; z-index: 999;
     background: #fff; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
@@ -16,31 +15,29 @@
   }
   #panel-header { background: #6366f1; color: white; padding: 10px 15px; cursor: move; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
   #panel-content { padding: 15px; }
-  #ai-text-input { width: 100%; height: 100px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; resize: none; margin-bottom: 10px; }
+  #ai-text-input { width: 100%; height: 100px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; resize: vertical; margin-bottom: 10px; }
   #parse-btn { background: #6366f1; color: white; border: none; width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
   
   #calendar { max-width: 100%; height: 100vh; background: #fff; padding: 10px; }
 
-  /* 右鍵選單樣式 */
   #custom-menu {
     display: none; position: fixed; z-index: 10000;
     background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     width: 180px; border: 1px solid #e2e8f0; overflow: hidden;
   }
-  .menu-item { padding: 12px 15px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
+  .menu-item { padding: 12px 15px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; }
   .menu-item:hover { background: #f8fafc; }
   
-  /* 🟢 時間軸標籤風格 (簡約) */
-  .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; padding-right: 5px; }
-  .minute-label { font-size: 11px; color: #94a3b8; padding-right: 5px; }
-  
-  /* 🟢 上方日期風格 */
-  .header-date { font-size: 16px; font-weight: bold; color: #1e293b; }
-  .header-day { font-size: 13px; color: #64748b; }
+  /* 🟢 時間與日期樣式優化 */
+  .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; }
+  .minute-label { font-size: 11px; color: #94a3b8; }
+  .header-date { font-size: 15px; font-weight: bold; color: #1e293b; line-height: 1; margin-bottom: 2px; }
+  .header-day { font-size: 12px; color: #64748b; font-weight: normal; }
 
   .event-inner { padding: 2px; color: white; line-height: 1.2; height: 100%; }
-  .event-time { font-size: 10px; opacity: 0.9; }
-  .event-title { font-size: 13px; font-weight: bold; }
+  .event-time { font-size: 10px; opacity: 0.9; margin-bottom: 2px; }
+  .event-title { font-size: 13px; font-weight: bold; display: block; }
+  .event-teacher { font-size: 11px; margin-top: 2px; display: flex; align-items: center; }
 </style>
 </head>
 <body>
@@ -63,8 +60,7 @@
 
   <div id='calendar'></div>
 
-  <script>
-    // Firebase 配置保持不變
+<script>
     const firebaseConfig = {
       apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
       authDomain: "lckroomtable.firebaseapp.com",
@@ -74,6 +70,7 @@
       messagingSenderId: "934661729012",
       appId: "1:934661729012:web:14b19af989cd72b2370ca1"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const eventRef = db.ref('bookings');
@@ -82,17 +79,6 @@
     let selectedEventInfo = null; 
     let multiSelectIds = new Set(); 
 
-    // 老師顏色管理
-    const teacherColors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
-    const assignedColors = {};
-    function getTeacherColor(name) {
-      if (!name || name === '以琳老師') return teacherColors[0];
-      if (assignedColors[name]) return assignedColors[name];
-      const nextColor = teacherColors[Object.keys(assignedColors).length % teacherColors.length] || '#14b8a6';
-      assignedColors[name] = nextColor;
-      return nextColor;
-    }
-
     function getEvId(ev) { return ev.startStr + "_" + ev.title + "_" + (ev.getResources()[0]?.id || ""); }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -100,31 +86,24 @@
       var calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'resourceTimeGridWeek',
         headerToolbar: { left: 'prev,next today', center: 'title', right: 'resourceTimeGridDay,resourceTimeGridWeek' },
+        buttonText: { today: '今天', resourceTimeGridDay: '日', resourceTimeGridWeek: '週' },
         locale: 'zh-tw',
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
         
-        // 🟢 修正：將日期顯示在資源（房間）之上
+        // 🟢 修改 1: 日期顯示在房號之上
         datesAboveResources: false, 
-
-        // 🟢 限制時間範圍
-        slotMinTime: '08:00:00',
-        slotMaxTime: '22:00:00',
-        slotDuration: '00:15:00',
-        slotLabelInterval: '00:15:00',
-        
-        selectable: true,
-        editable: true,
-        allDaySlot: false,
-
-        // 🟢 修正：日期欄風格 (顯示在最上方)
         dayHeaderContent: function(arg) {
-          const mm = arg.date.getMonth() + 1;
-          const dd = arg.date.getDate();
+          const m = arg.date.getMonth() + 1;
+          const d = arg.date.getDate();
           const dayName = ['週日','週一','週二','週三','週四','週五','週六'][arg.date.getDay()];
-          return { html: `<div class="header-date">${mm}/${dd}</div><div class="header-day">(${dayName})</div>` };
+          return { html: `<div class="header-date">${m}/${d}</div><div class="header-day">(${dayName})</div>` };
         },
 
-        // 🟢 修正：時間軸簡約風格 (小時 & 15, 30, 45)
+        // 🟢 修改 2: 時間顯示每小時及15、30、45
+        slotDuration: '00:15:00',
+        slotLabelInterval: '00:15:00',
+        slotMinTime: '08:00:00',
+        slotMaxTime: '22:00:00',
         slotLabelContent: function(arg) {
           const hour = arg.date.getHours();
           const min = arg.date.getMinutes();
@@ -134,10 +113,14 @@
           if (min === 0) {
             return { html: `<div class="hour-label">${ampm}${displayHour}時</div>` };
           } else {
-            // 只顯示 15, 30, 45 分
             return { html: `<div class="minute-label">${ampm}${displayHour}:${String(min).padStart(2, '0')}</div>` };
           }
         },
+
+        allDaySlot: false,
+        hiddenDays: [ 0 ],
+        selectable: true,
+        editable: true,
 
         eventContent: function(arg) {
           const isSelected = multiSelectIds.has(getEvId(arg.event));
@@ -146,21 +129,38 @@
             html: `<div class="event-inner" style="${borderStyle}">
                     <div class="event-time">${arg.timeText}</div>
                     <div class="event-title">${arg.event.title}</div>
-                    <div style="font-size:10px; opacity:0.8;">👤 ${arg.event.extendedProps.teacher || ''}</div>
+                    <div class="event-teacher">👤 ${arg.event.extendedProps.teacher || ''}</div>
                    </div>` 
           };
         },
 
+        eventChange: () => updateToCloud(),
+        eventRemove: () => updateToCloud(),
+
         select: function(info) {
-          // 點擊空白處新增或貼上邏輯保持不變
+          if (copiedEventsBatch.length > 0) {
+            if (confirm(`要在這貼上已複製的 ${copiedEventsBatch.length} 堂課嗎？`)) {
+              const pasteBaseStart = info.start;
+              copiedEventsBatch.forEach(data => {
+                const newStart = new Date(pasteBaseStart.getTime() + data.offset);
+                const newEnd = new Date(newStart.getTime() + data.duration);
+                calendar.addEvent({
+                  title: data.title, start: newStart, end: newEnd,
+                  resourceId: info.resource ? info.resource.id : data.resourceId,
+                  extendedProps: data.extendedProps, backgroundColor: data.backgroundColor
+                });
+              });
+              updateToCloud(); calendar.unselect(); return;
+            }
+          }
           var title = prompt('學生姓名：');
           if (title) {
-            var t = prompt('導師姓名：', '以琳老師');
-            calendar.addEvent({ 
-              title: title, start: info.startStr, end: info.endStr, 
-              resourceId: info.resource.id, 
-              extendedProps: { teacher: t || '以琳老師' }, 
-              backgroundColor: getTeacherColor(t) 
+            var teacher = prompt('導師姓名：', '以琳老師');
+            var color = (teacher && teacher !== '以琳老師') ? '#10b981' : '#6366f1';
+            calendar.addEvent({
+              title: title, start: info.startStr, end: info.endStr,
+              resourceId: info.resource.id, extendedProps: { teacher: teacher || '以琳老師' },
+              backgroundColor: color
             });
             updateToCloud();
           }
@@ -179,99 +179,109 @@
         },
 
         resources: [
-          { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' }, 
+          { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
           { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
         ]
       });
 
-      // 解析按鈕邏輯
-      document.getElementById('parse-btn').onclick = function() {
-        const text = document.getElementById('ai-text-input').value.trim();
-        if (!text) return;
+      // 功能動作
+      window.handleAction = function(action) {
+        if (!selectedEventInfo) return;
+        const evId = getEvId(selectedEventInfo);
 
-        let name = text.split('\n')[0].replace(/[^\u4e00-\u9fa5a-zA-Z]/g, '').substring(0, 4);
-        let teacher = "以琳老師";
-        const teacherMatch = text.match(/(?:導師|老師)\s*[｜|:：]\s*([^\s\n]+)/);
-        if (teacherMatch) teacher = teacherMatch[1].trim();
-
-        const dateMatches = text.match(/(\d{1,2})[月\/](\d{1,2})/g);
-        const timeMatch = text.match(/(\d{1,2}[:：]\d{2})\s*[-–—~]\s*(\d{1,2}[:：]\d{2})/);
-
-        if (dateMatches && timeMatch) {
-          const startTime = timeMatch[1].replace('：', ':');
-          const endTime = timeMatch[2].replace('：', ':');
-          const year = new Date().getFullYear();
-          const color = getTeacherColor(teacher);
-
-          dateMatches.forEach(dateStr => {
-            const d = dateStr.match(/(\d{1,2})[月\/](\d{1,2})/);
-            let rId = text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5')));
-            calendar.addEvent({
-              title: name,
-              start: `${year}-${d[1].padStart(2,'0')}-${d[2].padStart(2,'0')}T${startTime.padStart(5,'0')}:00`,
-              end: `${year}-${d[1].padStart(2,'0')}-${d[2].padStart(2,'0')}T${endTime.padStart(5,'0')}:00`,
-              resourceId: rId, extendedProps: { teacher: teacher }, backgroundColor: color
+        if (action === 'toggleSelect') {
+          multiSelectIds.has(evId) ? multiSelectIds.delete(evId) : multiSelectIds.add(evId);
+          calendar.render();
+        } 
+        else if (action === 'editName') {
+          const n = prompt('新學生姓名：', selectedEventInfo.title);
+          if (n) { selectedEventInfo.setProp('title', n); updateToCloud(); }
+        } 
+        else if (action === 'editTeacher') {
+          const t = prompt('新老師姓名：', selectedEventInfo.extendedProps.teacher);
+          if (t) {
+            const batch = multiSelectIds.has(evId) ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [selectedEventInfo];
+            batch.forEach(ev => {
+              ev.setExtendedProp('teacher', t);
+              ev.setProp('backgroundColor', (t !== '以琳老師' ? '#10b981' : '#6366f1'));
             });
-          });
-          updateToCloud();
-          document.getElementById('ai-text-input').value = "";
-          alert("解析成功並已同步！");
-        } else {
-          alert("解析失敗，請確認格式（需包含日期與時間範圍）");
+            updateToCloud();
+          }
+        } 
+        else if (action === 'copy') {
+          const targetEvents = multiSelectIds.has(evId) ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [selectedEventInfo];
+          targetEvents.sort((a, b) => a.start - b.start);
+          const baseStart = targetEvents[0].start;
+          copiedEventsBatch = targetEvents.map(ev => ({
+            title: ev.title, offset: ev.start - baseStart, duration: ev.end - ev.start,
+            resourceId: ev.getResources()[0]?.id, extendedProps: JSON.parse(JSON.stringify(ev.extendedProps)), backgroundColor: ev.backgroundColor
+          }));
+          alert(`已成功複製 ${copiedEventsBatch.length} 堂課！`);
+          multiSelectIds.clear(); calendar.render();
+        } 
+        else if (action === 'delete') {
+          const isMulti = multiSelectIds.has(evId);
+          if (confirm(`確定刪除嗎？`)) {
+            if (isMulti) {
+              calendar.getEvents().forEach(ev => { if (multiSelectIds.has(getEvId(ev))) ev.remove(); });
+              multiSelectIds.clear();
+            } else { selectedEventInfo.remove(); }
+            updateToCloud();
+          }
         }
+        document.getElementById('custom-menu').style.display = 'none';
       };
 
-      // 同步與面板拖動邏輯...
+      eventRef.on('value', (snapshot) => {
+        calendar.removeAllEvents();
+        calendar.addEventSource(snapshot.val() || []);
+      });
+
       function updateToCloud() {
         const events = calendar.getEvents().map(e => ({
-          title: e.title, start: e.startStr, end: e.endStr, resourceId: e.getResources()[0]?.id, extendedProps: e.extendedProps, backgroundColor: e.backgroundColor
+          title: e.title, start: e.startStr, end: e.endStr,
+          resourceId: e.getResources()[0]?.id, extendedProps: e.extendedProps,
+          backgroundColor: e.backgroundColor || '#6366f1'
         }));
         eventRef.set(events);
       }
 
-      eventRef.on('value', snap => {
-        calendar.removeAllEvents();
-        calendar.addEventSource(snap.val() || []);
-      });
+      document.getElementById('parse-btn').onclick = function() {
+        const text = document.getElementById('ai-text-input').value;
+        if (!text) return;
+        const dateMatches = text.match(/(\d{1,2})月(\d{1,2})日/g);
+        const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
+        if (dateMatches && timeMatch) {
+          const startTime = timeMatch[1].replace('：', ':');
+          const endTime = timeMatch[2].replace('：', ':');
+          let currentYear = new Date().getFullYear();
+          dateMatches.forEach(dateStr => {
+            const m = dateStr.match(/(\d{1,2})月(\d{1,2})日/);
+            let rId = text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5')));
+            calendar.addEvent({
+              title: text.split('\n')[0].substring(0, 3), 
+              start: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${startTime.padStart(5,'0')}:00`,
+              end: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${endTime.padStart(5,'0')}:00`,
+              resourceId: rId, extendedProps: { teacher: "以琳老師" }, backgroundColor: '#6366f1'
+            });
+          });
+          updateToCloud(); document.getElementById('ai-text-input').value = "";
+        }
+      };
 
-      // 面板拖拽
-      const panel = document.getElementById('smart-input-panel'), header = document.getElementById('panel-header'), toggleBtn = document.getElementById('toggle-btn');
-      header.onmousedown = (e) => { 
-        if(e.target===toggleBtn) return;
-        let ox = panel.offsetLeft - e.clientX, oy = panel.offsetTop - e.clientY;
-        document.onmousemove = (e) => { panel.style.left = (e.clientX+ox)+'px'; panel.style.top = (e.clientY+oy)+'px'; panel.style.right='auto'; };
-        document.onmouseup = () => document.onmousemove = null;
-      };
-      toggleBtn.onclick = () => {
-        const content = document.getElementById('panel-content');
-        content.style.display = content.style.display==='none'?'block':'none';
-        toggleBtn.innerText = content.style.display==='none'?'展開':'收起';
-      };
+      // 面板控制
+      const panel = document.getElementById('smart-input-panel');
+      const header = document.getElementById('panel-header');
+      const toggleBtn = document.getElementById('toggle-btn');
+      const content = document.getElementById('panel-content');
+      let isDragging = false; let offset = [0,0];
+      header.onmousedown = (e) => { if(e.target===toggleBtn) return; isDragging = true; offset = [panel.offsetLeft - e.clientX, panel.offsetTop - e.clientY]; };
+      document.onmousemove = (e) => { if(!isDragging) return; panel.style.left = (e.clientX+offset[0])+'px'; panel.style.top = (e.clientY+offset[1])+'px'; panel.style.right='auto'; };
+      document.onmouseup = () => isDragging = false;
+      toggleBtn.onclick = () => { content.style.display = content.style.display==='none'?'block':'none'; toggleBtn.innerText = content.style.display==='none'?'展開':'收起'; };
 
       calendar.render();
     });
-
-    // 右鍵菜單動作
-    window.handleAction = function(action) {
-      if (!selectedEventInfo) return;
-      if (action === 'delete') {
-        if(confirm('確定刪除選中課堂？')) {
-          const evId = getEvId(selectedEventInfo);
-          if (multiSelectIds.has(evId)) {
-            calendar.getEvents().forEach(e => { if(multiSelectIds.has(getEvId(e))) e.remove(); });
-            multiSelectIds.clear();
-          } else {
-            selectedEventInfo.remove();
-          }
-          updateToCloud();
-        }
-      } else if (action === 'toggleSelect') {
-        const id = getEvId(selectedEventInfo);
-        multiSelectIds.has(id) ? multiSelectIds.delete(id) : multiSelectIds.add(id);
-        calendar.render();
-      }
-      document.getElementById('custom-menu').style.display = 'none';
-    };
   </script>
 </body>
 </html>
