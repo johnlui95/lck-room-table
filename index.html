@@ -242,40 +242,56 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // 綁定 AI 解析按鈕
-    document.getElementById('parse-btn').addEventListener('click', function() {
-        const text = document.getElementById('ai-text-input').value.trim();
-        if (!text) return;
+document.getElementById('parse-btn').addEventListener('click', function() {
+    const text = document.getElementById('ai-text-input').value.trim();
+    if (!text) return;
 
-        const nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
-        const name = nameMatch ? nameMatch[1] : "新學生";
-        const dateMatches = text.match(/(\d{1,2})月(\d{1,2})日/g);
-        const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
+    // 1. 解析學生姓名
+    const nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
+    const name = nameMatch ? nameMatch[1] : "新學生";
 
-        if (dateMatches && timeMatch) {
-            const startT = timeMatch[1].replace('：', ':');
-            const endT = timeMatch[2].replace('：', ':');
+    // 2. 解析日期與時間
+    const dateMatches = text.match(/(\d{1,2})月(\d{1,2})日/g);
+    const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
+
+    // 3. 🔴 加強版：解析老師名稱 (抓取「|」之後的文字)
+    let teacherName = '以琳老師'; // 預設值
+    const teacherMatch = text.match(/[|｜]\s*(\S+?)(?:老師)?(?:\n|$|\s)/); 
+    if (teacherMatch) {
+        teacherName = teacherMatch[1].includes('老師') ? teacherMatch[1] : teacherMatch[1] + '老師';
+    } else if (text.includes('JK')) {
+        teacherName = 'JK老師';
+    }
+
+    // 4. 自動分配背景顏色
+    let bgColor = '#6366f1'; // 預設紫色
+    if (teacherName.includes('JK')) bgColor = '#10b981'; // JK老師 綠色
+    if (teacherName.includes('以琳')) bgColor = '#6366f1'; // 以琳老師 紫色
+
+    if (dateMatches && timeMatch) {
+        const startT = timeMatch[1].replace('：', ':');
+        const endT = timeMatch[2].replace('：', ':');
+        
+        dateMatches.forEach(dStr => {
+            const m = dStr.match(/(\d{1,2})月(\d{1,2})日/);
             
-            dateMatches.forEach(dStr => {
-                const m = dStr.match(/(\d{1,2})月(\d{1,2})日/);
-                const teacherName = text.includes('JK') ? 'JK老師' : '以琳老師';
-                const bgColor = text.includes('JK') ? '#10b981' : '#6366f1';
-
-                calendar.addEvent({
-                    title: name,
-                    start: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${startT.padStart(5,'0')}:00`,
-                    end: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${endT.padStart(5,'0')}:00`,
-                    resourceId: text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5'))),
-                    extendedProps: { teacher: teacherName },
-                    backgroundColor: bgColor
-                });
+            calendar.addEvent({
+                title: name,
+                start: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${startT.padStart(5,'0')}:00`,
+                end: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${endT.padStart(5,'0')}:00`,
+                // 房間分配
+                resourceId: text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5'))),
+                extendedProps: { teacher: teacherName },
+                backgroundColor: bgColor
             });
-            updateToCloud();
-            document.getElementById('ai-text-input').value = "";
-            alert("同步成功！");
-        } else {
-            alert("解析失敗，請確認內容包含日期(x月x日)與時間段(00:00-00:00)");
-        }
-    });
+        });
+        updateToCloud();
+        document.getElementById('ai-text-input').value = "";
+        alert(`成功解析：${name} (${teacherName})`);
+    } else {
+        alert("格式不符，請確保訊息包含日期與時間段。");
+    }
+});
 
     // 從 Firebase 載入資料
     eventRef.on('value', (snap) => {
