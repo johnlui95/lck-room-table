@@ -31,9 +31,8 @@
     display: flex; align-items: center; transition: background 0.2s;
   }
   .menu-item:hover { background: #f8fafc; }
-  .menu-item:last-child { border-bottom: none; color: #ef4444; } /* 刪除按鈕標紅 */
+  .menu-item:last-child { border-bottom: none; color: #ef4444; }
 
-  /* 左側時間軸與方塊樣式維持原樣 */
   .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; }
   .minute-label { font-size: 11px; color: #94a3b8; }
   .event-inner { padding: 2px; color: white; line-height: 1.2; }
@@ -82,7 +81,7 @@
     const eventRef = db.ref('bookings');
 
     let copiedEvent = null;
-    let selectedEventInfo = null; // 紀錄目前點擊的是哪個事件
+    let selectedEventInfo = null;
 
     document.addEventListener('DOMContentLoaded', function() {
       var calendarEl = document.getElementById('calendar');
@@ -149,27 +148,25 @@
           var title = prompt('學生姓名：');
           if (title) {
             var teacher = prompt('導師姓名：', '以琳老師');
+            // 如果不是預設老師，使用綠色，否則使用紫色
+            var color = (teacher && teacher !== '以琳老師') ? '#10b981' : '#6366f1';
             calendar.addEvent({
               title: title, start: info.startStr, end: info.endStr,
               resourceId: info.resource.id, extendedProps: { teacher: teacher || '以琳老師' },
-              backgroundColor: '#6366f1'
+              backgroundColor: color
             });
             updateToCloud();
           }
           calendar.unselect();
         },
 
-        // 🔴 點擊課堂改為顯示自定義選單
         eventClick: function(info) {
           info.jsEvent.preventDefault();
           selectedEventInfo = info.event;
-          
           const menu = document.getElementById('custom-menu');
           menu.style.display = 'block';
           menu.style.left = info.jsEvent.clientX + 'px';
           menu.style.top = info.jsEvent.clientY + 'px';
-
-          // 點擊外面關閉選單
           const closeMenu = () => {
             menu.style.display = 'none';
             document.removeEventListener('click', closeMenu);
@@ -183,16 +180,19 @@
         ]
       });
 
-      // 🔴 處理選單動作
       window.handleAction = function(action) {
         if (!selectedEventInfo) return;
-        
         if (action === 'editName') {
           const newName = prompt('新學生姓名：', selectedEventInfo.title);
           if (newName) selectedEventInfo.setProp('title', newName);
         } else if (action === 'editTeacher') {
           const newTeacher = prompt('新老師姓名：', selectedEventInfo.extendedProps.teacher);
-          if (newTeacher) selectedEventInfo.setExtendedProp('teacher', newTeacher);
+          if (newTeacher) {
+            selectedEventInfo.setExtendedProp('teacher', newTeacher);
+            // 修改老師名時也同步更新顏色
+            var newColor = (newTeacher !== '以琳老師') ? '#10b981' : '#6366f1';
+            selectedEventInfo.setProp('backgroundColor', newColor);
+          }
         } else if (action === 'copy') {
           copiedEvent = {
             title: selectedEventInfo.title,
@@ -203,7 +203,6 @@
         } else if (action === 'delete') {
           if (confirm(`確定刪除「${selectedEventInfo.title}」？`)) selectedEventInfo.remove();
         }
-        
         updateToCloud();
         document.getElementById('custom-menu').style.display = 'none';
       };
@@ -224,26 +223,44 @@
         eventRef.set(events);
       }
 
-      // AI 解析邏輯與面板拖拽 (維持原樣)
+      // ✨ 修正後的 AI 解析邏輯
       document.getElementById('parse-btn').onclick = function() {
         const text = document.getElementById('ai-text-input').value;
         if (!text) return;
+
+        // 1. 解析姓名
         let nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
         let name = nameMatch ? nameMatch[1] : text.split('\n')[0].substring(0, 3);
+
+        // 2. 解析導師 (這就是之前出錯的地方，現在會正確讀取變數)
+        let teacher = "以琳老師";
+        const teacherMatch = text.match(/導師\s*[｜|:：]\s*([^\s\n]+)/);
+        if (teacherMatch) {
+          teacher = teacherMatch[1].trim();
+        }
+
         const dateMatches = text.match(/(\d{1,2})月(\d{1,2})日/g);
         const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
+
         if (dateMatches && timeMatch) {
           const startTime = timeMatch[1].replace('：', ':');
           const endTime = timeMatch[2].replace('：', ':');
           let currentYear = new Date().getFullYear();
+          
+          // 根據老師決定顏色
+          let color = (teacher !== '以琳老師') ? '#10b981' : '#6366f1';
+
           dateMatches.forEach(dateStr => {
             const m = dateStr.match(/(\d{1,2})月(\d{1,2})日/);
             let rId = text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5')));
+            
             calendar.addEvent({
               title: name,
               start: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${startTime.padStart(5,'0')}:00`,
               end: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${endTime.padStart(5,'0')}:00`,
-              resourceId: rId, extendedProps: { teacher: '以琳老師' }, backgroundColor: '#6366f1'
+              resourceId: rId, 
+              extendedProps: { teacher: teacher }, // ✅ 這裡現在會使用解析出來的 teacher 變數
+              backgroundColor: color // ✅ 自動套用顏色
             });
           });
           updateToCloud();
