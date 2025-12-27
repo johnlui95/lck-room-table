@@ -1,245 +1,296 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset='utf-8' />
-  <script src='https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@6.1.10/index.global.min.js'></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <meta charset='utf-8' />
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@6.1.10/index.global.min.js'></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <style>
-  body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; background-color: #f8fafc; overflow: hidden; }
-  
-  /* 面板風格保持圖片中的藍紫色系 */
-  #smart-input-panel {
-    position: fixed; top: 20px; right: 20px; width: 320px; z-index: 999;
-    background: #fff; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-    border: 1px solid #e2e8f0; overflow: hidden;
-  }
-  #panel-header { background: #6366f1; color: white; padding: 10px 15px; cursor: move; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-  #panel-content { padding: 15px; }
-  #ai-text-input { width: 100%; height: 100px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; resize: none; margin-bottom: 10px; }
-  #parse-btn { background: #6366f1; color: white; border: none; width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-  
-  #calendar { max-width: 100%; height: 100vh; background: #fff; padding: 10px; }
+  body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; background-color: #f8fafc; overflow: hidden; }
+  
+  #smart-input-panel {
+    position: fixed; top: 20px; right: 20px; width: 320px; z-index: 999;
+    background: #fff; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    border: 1px solid #e2e8f0; overflow: hidden;
+  }
+  #panel-header { background: #6366f1; color: white; padding: 10px 15px; cursor: move; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+  #panel-content { padding: 15px; }
+  #ai-text-input { width: 100%; height: 100px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; resize: vertical; margin-bottom: 10px; }
+  #parse-btn { background: #6366f1; color: white; border: none; width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  
+  #calendar { max-width: 100%; height: 100vh; background: #fff; padding: 10px; }
 
-  /* 自定義選單樣式 */
-  #custom-menu {
-    display: none; position: fixed; z-index: 10000;
-    background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-    width: 180px; border: 1px solid #e2e8f0; overflow: hidden;
-  }
-  .menu-item { padding: 12px 15px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
-  .menu-item:hover { background: #f8fafc; }
-  
-  /* 圖片中的時間標籤風格 */
-  .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; }
-  .minute-label { font-size: 11px; color: #94a3b8; }
+  #custom-menu {
+    display: none; position: fixed; z-index: 10000;
+    background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    width: 180px; border: 1px solid #e2e8f0; overflow: hidden;
+  }
+  .menu-item { padding: 12px 15px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; }
+  .menu-item:hover { background: #f8fafc; }
+  
+  /* ✨ 選中狀態的視覺效果 - 直接作用於 event 容器 */
+  .fc-event-selected {
+    border: 3px solid #facc15 !important;
+    box-shadow: 0 0 12px rgba(250, 204, 21, 0.9) !important;
+    z-index: 99 !important;
+  }
 
-  /* 選中狀態：金色外框 */
-  .event-selected-style {
-    border: 3px solid #facc15 !important;
-    box-shadow: 0 0 10px rgba(250, 204, 21, 0.8) !important;
-    z-index: 100 !important;
-  }
+  .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; }
+  .minute-label { font-size: 11px; color: #94a3b8; }
+  .event-inner { padding: 2px; color: white; line-height: 1.2; height: 100%; }
+  .event-time { font-size: 10px; opacity: 0.9; margin-bottom: 2px; }
+  .event-title { font-size: 13px; font-weight: bold; display: block; }
+  .event-teacher { font-size: 11px; margin-top: 2px; display: flex; align-items: center; }
 
-  .event-inner { padding: 2px; color: white; line-height: 1.2; height: 100%; }
-  .event-time { font-size: 10px; opacity: 0.9; margin-bottom: 2px; }
-  .event-title { font-size: 13px; font-weight: bold; }
+  @media (max-width: 768px) {
+    #smart-input-panel { width: 90%; right: 5%; top: 10px; }
+    .fc-header-toolbar { flex-direction: column; font-size: 12px; }
+  }
 </style>
 </head>
 <body>
 
-  <div id="custom-menu">
-    <div class="menu-item" onclick="handleAction('toggleSelect')">✅ 選取 / 取消</div>
-    <div class="menu-item" onclick="handleAction('editName')">✏️ 修改學生名</div>
-    <div class="menu-item" onclick="handleAction('editTeacher')">👤 修改老師名</div>
-    <div class="menu-item" onclick="handleAction('copy')">📋 複製 (含多選)</div>
-    <div class="menu-item" style="color:red;" onclick="handleAction('delete')">🗑️ 刪除 (含多選)</div>
-  </div>
+  <div id="custom-menu">
+    <div class="menu-item" onclick="handleAction('toggleSelect')">✅ 選取 / 取消</div>
+    <div class="menu-item" onclick="handleAction('editName')">✏️ 修改學生名</div>
+    <div class="menu-item" onclick="handleAction('editTeacher')">👤 修改老師名</div>
+    <div class="menu-item" onclick="handleAction('copy')">📋 複製課堂</div>
+    <div class="menu-item" style="color:red;" onclick="handleAction('delete')">🗑️ 刪除 (含選中)</div>
+  </div>
 
-  <div id="smart-input-panel">
-    <div id="panel-header"><span>雲端排課助手</span><button id="toggle-btn" style="cursor:pointer; background:none; border:none; color:white;">收起</button></div>
-    <div id="panel-content">
-      <textarea id="ai-text-input" placeholder="在此貼上訊息內容..."></textarea>
-      <button id="parse-btn">解析並同步至雲端</button>
-    </div>
-  </div>
+  <div id="smart-input-panel">
+    <div id="panel-header"><span>雲端排課助手</span><button id="toggle-btn" style="cursor:pointer; background:none; border:none; color:white;">收起</button></div>
+    <div id="panel-content">
+      <textarea id="ai-text-input" placeholder="在此貼上訊息內容..."></textarea>
+      <button id="parse-btn">解析並同步至雲端</button>
+    </div>
+  </div>
 
-  <div id='calendar'></div>
+  <div id='calendar'></div>
 
-  <script>
-    // --- Firebase 配置 (保持您的設定) ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
-      authDomain: "lckroomtable.firebaseapp.com",
-      databaseURL: "https://lckroomtable-default-rtdb.firebaseio.com",
-      projectId: "lckroomtable",
-      storageBucket: "lckroomtable.firebasestorage.app",
-      messagingSenderId: "934661729012",
-      appId: "1:934661729012:web:14b19af989cd72b2370ca1"
-    };
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
+      authDomain: "lckroomtable.firebaseapp.com",
+      databaseURL: "https://lckroomtable-default-rtdb.firebaseio.com",
+      projectId: "lckroomtable",
+      storageBucket: "lckroomtable.firebasestorage.app",
+      messagingSenderId: "934661729012",
+      appId: "1:934661729012:web:14b19af989cd72b2370ca1"
+    };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    const eventRef = db.ref('bookings');
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const eventRef = db.ref('bookings');
 
-    let copiedEventsBatch = []; 
-    let selectedEventInfo = null; 
-    let multiSelectIds = new Set(); 
+    let copiedEvent = null;
+    let selectedEventInfo = null; 
+    let multiSelectIds = new Set(); 
 
-    function getEvId(ev) {
-      return ev.startStr + "_" + ev.title + "_" + (ev.getResources()[0]?.id || "");
-    }
+    // 取得唯一辨識碼的補助函數
+    function getEvId(ev) {
+      return ev.startStr + "_" + ev.title + "_" + (ev.getResources()[0]?.id || "");
+    }
 
-    document.addEventListener('DOMContentLoaded', function() {
-      var calendarEl = document.getElementById('calendar');
-      var calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'resourceTimeGridWeek',
-        headerToolbar: { left: 'prev,next today', center: 'title', right: 'resourceTimeGridDay,resourceTimeGridWeek' },
-        buttonText: { today: '今天', resourceTimeGridDay: '日', resourceTimeGridWeek: '週' },
-        locale: 'zh-tw',
-        schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
-        slotDuration: '00:15:00',
-        slotMinTime: '08:00:00',
-        slotMaxTime: '22:00:00',
-        allDaySlot: false,
-        selectable: true,
-        editable: true,
+    document.addEventListener('DOMContentLoaded', function() {
+      var calendarEl = document.getElementById('calendar');
+      var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'resourceTimeGridWeek',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'resourceTimeGridDay,resourceTimeGridWeek'
+        },
+        buttonText: { today: '今天', resourceTimeGridDay: '日', resourceTimeGridWeek: '週' },
+        locale: 'zh-tw',
+        schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
+        datesAboveResources: true,
+        slotDuration: '00:15:00',
+        slotLabelInterval: '00:15:00',
+        slotMinTime: '08:00:00',
+        slotMaxTime: '22:00:00',
+        allDaySlot: false,
+        hiddenDays: [ 0 ],
+        selectable: true,
+        editable: true,
 
-        // 🟢 恢復之前的時間標籤風格 (上午/下午時分)
-        slotLabelContent: function(arg) {
-          let mins = arg.date.getMinutes();
-          let hour = arg.date.getHours();
-          let ampm = hour >= 12 ? '下午' : '上午';
-          let displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-          
-          if (mins === 0) {
-            return { html: `<div class="hour-label">${ampm}${displayHour}時</div>` };
-          }
-          return { html: `<div class="minute-label">${ampm}${displayHour}:${mins}</div>` };
-        },
+        eventContent: function(arg) {
+          const isSelected = multiSelectIds.has(getEvId(arg.event));
+          // 如果被選中，直接在渲染時加上邊框樣式
+          const borderStyle = isSelected ? 'border: 3px solid #facc15; box-shadow: 0 0 8px rgba(250,204,21,0.8);' : '';
+          
+          return { 
+            html: `<div class="event-inner" style="${borderStyle}">
+                    <div class="event-time">${arg.timeText}</div>
+                    <div class="event-title">${arg.event.title}</div>
+                    <div class="event-teacher">👤 ${arg.event.extendedProps.teacher || ''}</div>
+                   </div>` 
+          };
+        },
 
-        eventContent: function(arg) {
-          const isSelected = multiSelectIds.has(getEvId(arg.event));
-          const borderStyle = isSelected ? 'border: 3px solid #facc15; box-shadow: 0 0 8px rgba(250,204,21,0.8);' : '';
-          return { 
-            html: `<div class="event-inner" style="${borderStyle}">
-                    <div class="event-time">${arg.timeText}</div>
-                    <div class="event-title">${arg.event.title}</div>
-                    <div class="event-teacher">👤 ${arg.event.extendedProps.teacher || ''}</div>
-                   </div>` 
-          };
-        },
+        eventChange: () => updateToCloud(),
+        eventRemove: () => updateToCloud(),
 
-        // 貼上與選取邏輯
-        select: function(info) {
-          if (copiedEventsBatch.length > 0) {
-            if (confirm(`要在這貼上已複製的 ${copiedEventsBatch.length} 堂課嗎？`)) {
-              copiedEventsBatch.forEach(data => {
-                const newStart = new Date(info.start.getTime() + data.offset);
-                const newEnd = new Date(newStart.getTime() + data.duration);
-                calendar.addEvent({
-                  title: data.title, start: newStart, end: newEnd,
-                  resourceId: info.resource.id, extendedProps: data.extendedProps,
-                  backgroundColor: data.backgroundColor
-                });
-              });
-              updateToCloud(); calendar.unselect(); return;
-            }
-          }
-          var title = prompt('學生姓名：');
-          if (title) {
-            var teacher = prompt('導師姓名：', '以琳老師');
-            calendar.addEvent({
-              title: title, start: info.startStr, end: info.endStr,
-              resourceId: info.resource.id, extendedProps: { teacher: teacher || '以琳老師' },
-              backgroundColor: (teacher !== '以琳老師' ? '#10b981' : '#6366f1')
-            });
-            updateToCloud();
-          }
-          calendar.unselect();
-        },
+        select: function(info) {
+          if (copiedEvent) {
+            if (confirm(`要貼上已複製的「${copiedEvent.title}」嗎？`)) {
+              calendar.addEvent({
+                title: copiedEvent.title, start: info.startStr, end: info.endStr,
+                resourceId: info.resource.id, extendedProps: copiedEvent.extendedProps,
+                backgroundColor: copiedEvent.backgroundColor
+              });
+              updateToCloud(); calendar.unselect(); return;
+            }
+          }
+          var title = prompt('學生姓名：');
+          if (title) {
+            var teacher = prompt('導師姓名：', '以琳老師');
+            var color = (teacher && teacher !== '以琳老師') ? '#10b981' : '#6366f1';
+            calendar.addEvent({
+              title: title, start: info.startStr, end: info.endStr,
+              resourceId: info.resource.id, extendedProps: { teacher: teacher || '以琳老師' },
+              backgroundColor: color
+            });
+            updateToCloud();
+          }
+          calendar.unselect();
+        },
 
-        eventClick: function(info) {
-          info.jsEvent.preventDefault();
-          selectedEventInfo = info.event;
-          const menu = document.getElementById('custom-menu');
-          menu.style.display = 'block';
-          menu.style.left = info.jsEvent.clientX + 'px';
-          menu.style.top = info.jsEvent.clientY + 'px';
-          const closeMenu = (e) => { if(!menu.contains(e.target)) { menu.style.display = 'none'; document.removeEventListener('mousedown', closeMenu); } };
-          setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
-        },
+        eventClick: function(info) {
+          info.jsEvent.preventDefault();
+          selectedEventInfo = info.event;
+          const menu = document.getElementById('custom-menu');
+          menu.style.display = 'block';
+          menu.style.left = info.jsEvent.clientX + 'px';
+          menu.style.top = info.jsEvent.clientY + 'px';
+          
+          const closeMenu = (e) => { 
+            if(!menu.contains(e.target)) { 
+              menu.style.display = 'none'; 
+              document.removeEventListener('mousedown', closeMenu); 
+            } 
+          };
+          setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
+        },
 
-        resources: [
-          { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
-          { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
-        ]
-      });
+        resources: [
+          { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
+          { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
+        ]
+      });
 
-      window.handleAction = function(action) {
-        if (!selectedEventInfo) return;
-        const evId = getEvId(selectedEventInfo);
+      window.handleAction = function(action) {
+        if (!selectedEventInfo) return;
+        const evId = getEvId(selectedEventInfo);
 
-        if (action === 'toggleSelect') {
-          multiSelectIds.has(evId) ? multiSelectIds.delete(evId) : multiSelectIds.add(evId);
-          calendar.render();
-        } 
-        else if (action === 'copy') {
-          const targetEvents = multiSelectIds.has(evId) ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [selectedEventInfo];
-          targetEvents.sort((a, b) => a.start - b.start);
-          const baseStart = targetEvents[0].start;
-          copiedEventsBatch = targetEvents.map(ev => ({
-            title: ev.title, offset: ev.start - baseStart, duration: ev.end - ev.start,
-            resourceId: ev.getResources()[0]?.id, extendedProps: ev.extendedProps, backgroundColor: ev.backgroundColor
-          }));
-          alert(`已複製 ${copiedEventsBatch.length} 堂課`);
-          multiSelectIds.clear(); calendar.render();
-        } 
-        else if (action === 'delete') {
-          if (confirm('確定刪除選中課程？')) {
-            const targets = multiSelectIds.has(evId) ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [selectedEventInfo];
-            targets.forEach(e => e.remove());
-            multiSelectIds.clear(); updateToCloud();
-          }
-        }
-        else if (action === 'editName') {
-          const n = prompt('新名字：', selectedEventInfo.title);
-          if(n) { selectedEventInfo.setProp('title', n); updateToCloud(); }
-        }
-        document.getElementById('custom-menu').style.display = 'none';
-      };
+        if (action === 'toggleSelect') {
+          if (multiSelectIds.has(evId)) {
+            multiSelectIds.delete(evId);
+          } else {
+            multiSelectIds.add(evId);
+          }
+          calendar.render(); // ✨ 重要：強制日曆重新渲染以顯示邊框
+        } 
+        else if (action === 'editName') {
+          const n = prompt('新學生姓名：', selectedEventInfo.title);
+          if (n) {
+            selectedEventInfo.setProp('title', n);
+            updateToCloud();
+          }
+        } 
+        else if (action === 'editTeacher') {
+          const t = prompt('新老師姓名：', selectedEventInfo.extendedProps.teacher);
+          if (t) {
+            const batch = multiSelectIds.has(evId) 
+              ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) 
+              : [selectedEventInfo];
+            
+            batch.forEach(ev => {
+              ev.setExtendedProp('teacher', t);
+              ev.setProp('backgroundColor', (t !== '以琳老師' ? '#10b981' : '#6366f1'));
+            });
+            updateToCloud();
+          }
+        } 
+        else if (action === 'copy') {
+          copiedEvent = { title: selectedEventInfo.title, extendedProps: selectedEventInfo.extendedProps, backgroundColor: selectedEventInfo.backgroundColor };
+          alert(`已複製「${selectedEventInfo.title}」`);
+        } 
+        else if (action === 'delete') {
+          const isMulti = multiSelectIds.has(evId);
+          const count = isMulti ? multiSelectIds.size : 1;
+          if (confirm(`確定刪除這 ${count} 堂課嗎？`)) {
+            if (isMulti) {
+              calendar.getEvents().forEach(ev => {
+                if (multiSelectIds.has(getEvId(ev))) ev.remove();
+              });
+              multiSelectIds.clear();
+            } else {
+              selectedEventInfo.remove();
+            }
+            updateToCloud();
+          }
+        }
+        document.getElementById('custom-menu').style.display = 'none';
+      };
 
-      eventRef.on('value', (snapshot) => {
-        calendar.removeAllEvents();
-        calendar.addEventSource(snapshot.val() || []);
-      });
+      eventRef.on('value', (snapshot) => {
+        const cloudEvents = snapshot.val() || [];
+        calendar.removeAllEvents();
+        calendar.addEventSource(cloudEvents);
+      });
 
-      function updateToCloud() {
-        const events = calendar.getEvents().map(e => ({
-          title: e.title, start: e.startStr, end: e.endStr,
-          resourceId: e.getResources()[0]?.id, extendedProps: e.extendedProps, backgroundColor: e.backgroundColor || '#6366f1'
-        }));
-        eventRef.set(events);
-      }
+      function updateToCloud() {
+        const events = calendar.getEvents().map(e => ({
+          title: e.title, start: e.startStr, end: e.endStr,
+          resourceId: e.getResources()[0]?.id,
+          extendedProps: e.extendedProps,
+          backgroundColor: e.backgroundColor || '#6366f1'
+        }));
+        eventRef.set(events);
+      }
 
-      // AI 解析與拖動面板邏輯保持不變...
-      const panel = document.getElementById('smart-input-panel');
-      const header = document.getElementById('panel-header');
-      const toggleBtn = document.getElementById('toggle-btn');
-      header.onmousedown = (e) => { 
-        if(e.target===toggleBtn) return;
-        let ox = panel.offsetLeft - e.clientX, oy = panel.offsetTop - e.clientY;
-        document.onmousemove = (e) => { panel.style.left = (e.clientX+ox)+'px'; panel.style.top = (e.clientY+oy)+'px'; panel.style.right='auto'; };
-        document.onmouseup = () => document.onmousemove = null;
-      };
-      toggleBtn.onclick = () => {
-        const content = document.getElementById('panel-content');
-        content.style.display = content.style.display==='none'?'block':'none';
-        toggleBtn.innerText = content.style.display==='none'?'展開':'收起';
-      };
+      // AI 解析
+      document.getElementById('parse-btn').onclick = function() {
+        const text = document.getElementById('ai-text-input').value;
+        if (!text) return;
+        let nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
+        let name = nameMatch ? nameMatch[1] : text.split('\n')[0].substring(0, 3);
+        let teacher = "以琳老師";
+        const teacherMatch = text.match(/導師\s*[｜|:：]\s*([^\s\n]+)/);
+        if (teacherMatch) teacher = teacherMatch[1].trim();
+        const dateMatches = text.match(/(\d{1,2})月(\d{1,2})日/g);
+        const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
+        if (dateMatches && timeMatch) {
+          const startTime = timeMatch[1].replace('：', ':');
+          const endTime = timeMatch[2].replace('：', ':');
+          let currentYear = new Date().getFullYear();
+          let color = (teacher !== '以琳老師') ? '#10b981' : '#6366f1';
+          dateMatches.forEach(dateStr => {
+            const m = dateStr.match(/(\d{1,2})月(\d{1,2})日/);
+            let rId = text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5')));
+            calendar.addEvent({
+              title: name, start: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${startTime.padStart(5,'0')}:00`,
+              end: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${endTime.padStart(5,'0')}:00`,
+              resourceId: rId, extendedProps: { teacher: teacher }, backgroundColor: color
+            });
+          });
+          updateToCloud(); document.getElementById('ai-text-input').value = "";
+        }
+      };
 
-      calendar.render();
-    });
-  </script>
+      const panel = document.getElementById('smart-input-panel');
+      const header = document.getElementById('panel-header');
+      const toggleBtn = document.getElementById('toggle-btn');
+      const content = document.getElementById('panel-content');
+      let isDragging = false; let offset = [0,0];
+      header.onmousedown = (e) => { if(e.target===toggleBtn) return; isDragging = true; offset = [panel.offsetLeft - e.clientX, panel.offsetTop - e.clientY]; };
+      document.onmousemove = (e) => { if(!isDragging) return; panel.style.left = (e.clientX+offset[0])+'px'; panel.style.top = (e.clientY+offset[1])+'px'; panel.style.right='auto'; };
+      document.onmouseup = () => isDragging = false;
+      toggleBtn.onclick = () => { content.style.display = content.style.display==='none'?'block':'none'; toggleBtn.innerText = content.style.display==='none'?'展開':'收起'; };
+
+      calendar.render();
+    });
+  </script>
 </body>
 </html>
