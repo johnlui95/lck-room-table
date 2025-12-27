@@ -86,7 +86,46 @@
   
 
   
-<script>
+// --- 全域變數定義 ---
+const firebaseConfig = {
+    apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
+    authDomain: "lckroomtable.firebaseapp.com",
+    databaseURL: "https://lckroomtable-default-rtdb.firebaseio.com",
+    projectId: "lckroomtable",
+    storageBucket: "lckroomtable.firebasestorage.app",
+    messagingSenderId: "934661729012",
+    appId: "1:934661729012:web:14b19af989cd72b2370ca1"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const eventRef = db.ref('bookings');
+
+let calendar; // 將 calendar 提升至全域作用域
+let copiedEventsBatch = [];
+let selectedEventInfo = null;
+let multiSelectIds = new Set();
+
+// 輔助函式
+function getEvId(ev) {
+    return ev.startStr + "_" + ev.title + "_" + (ev.getResources()[0]?.id || "");
+}
+
+// 雲端同步函式
+function updateToCloud() {
+    if (!calendar) return;
+    const events = calendar.getEvents().map(e => ({
+        title: e.title,
+        start: e.startStr,
+        end: e.endStr,
+        resourceId: e.getResources()[0]?.id,
+        extendedProps: e.extendedProps,
+        backgroundColor: e.backgroundColor || '#6366f1'
+    }));
+    eventRef.set(events);
+}
+
+// 介面交互邏輯
 document.getElementById('toggle-btn').onclick = function() {
     const content = document.getElementById('panel-content');
     if (content.style.display === 'none') {
@@ -97,36 +136,25 @@ document.getElementById('toggle-btn').onclick = function() {
         this.innerText = '展開';
     }
 };
-  
-  // 在你的 script 標籤內加入以下邏輯
-// --- 拖拽功能開始 ---
+
+// --- 拖拽功能邏輯 ---
 const panel = document.getElementById('smart-input-panel');
 const header = document.getElementById('panel-header');
-
 let active = false;
-let currentX;
-let currentY;
-let initialX;
-let initialY;
-let xOffset = 0;
-let yOffset = 0;
+let currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
 
 header.addEventListener("mousedown", dragStart);
 document.addEventListener("mousemove", drag);
 document.addEventListener("mouseup", dragEnd);
 
 function dragStart(e) {
-    // 只有點擊 header 才能觸發移動
     if (e.target === header || header.contains(e.target)) {
-        // 如果點擊的是「收起」按鈕，則不觸發拖拽
         if (e.target.id === 'toggle-btn') return;
-        
         initialX = e.clientX - xOffset;
         initialY = e.clientY - yOffset;
         active = true;
     }
 }
-
 function drag(e) {
     if (active) {
         e.preventDefault();
@@ -134,40 +162,15 @@ function drag(e) {
         currentY = e.clientY - initialY;
         xOffset = currentX;
         yOffset = currentY;
-        // 使用 transform 移動，不會觸發日曆的重繪
         panel.style.transform = `translate(${currentX}px, ${currentY}px)`;
     }
 }
+function dragEnd() { active = false; }
 
-function dragEnd() {
-    active = false;
-}
-// --- 拖拽功能結束 ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
-      authDomain: "lckroomtable.firebaseapp.com",
-      databaseURL: "https://lckroomtable-default-rtdb.firebaseio.com",
-      projectId: "lckroomtable",
-      storageBucket: "lckroomtable.firebasestorage.app",
-      messagingSenderId: "934661729012",
-      appId: "1:934661729012:web:14b19af989cd72b2370ca1"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    const eventRef = db.ref('bookings');
-
-    let copiedEventsBatch = []; 
-    let selectedEventInfo = null; 
-    let multiSelectIds = new Set(); 
-
-    function getEvId(ev) {
-      return ev.startStr + "_" + ev.title + "_" + (ev.getResources()[0]?.id || "");
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-      var calendarEl = document.getElementById('calendar');
-      var calendar = new FullCalendar.Calendar(calendarEl, {
+// --- 主程式初始化 ---
+document.addEventListener('DOMContentLoaded', function() {
+    var calendarEl = document.getElementById('calendar');
+    calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'resourceTimeGridWeek',
         headerToolbar: {
             left: 'prev,next today',
@@ -176,206 +179,110 @@ function dragEnd() {
         },
         locale: 'zh-tw',
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
-        
-        // 🔴 關鍵修正：將房間置於日期之下 (5間房間並列)
-        datesAboveResources: true, 
-        
-dayHeaderContent: function(arg) {
-        const date = arg.date;
-        const dayName = ['週日','週一','週二','週三','週四','週五','週六'][date.getDay()];
-        const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-        return { 
-          html: `<div style="font-weight:bold; font-size:15px; color:#1e293b;">${dateStr}</div>
-                 <div style="font-size:12px; color:#64748b;">(${dayName})</div>` 
-        };
-    },
-
-        // 🟢 時間軸優化 (對齊圖片樣式)
+        datesAboveResources: true,
         slotDuration: '00:15:00',
         slotLabelInterval: '00:15:00',
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
         allDaySlot: false,
-slotLabelContent: function(arg) {
-        const hour = arg.date.getHours();
-        const min = arg.date.getMinutes();
-        const ampm = hour >= 12 ? '下午' : '上午';
-        let displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-        
-        if (min === 0) {
-            // 整點顯示：上午8時
-            return { html: `<div class="hour-label" style="font-weight:bold;">${ampm}${displayHour}時</div>` };
-        } else {
-            // 刻度顯示：上午8:15
-            return { html: `<div class="minute-label" style="font-size:11px; color:#94a3b8; opacity:0.8;">${ampm}${displayHour}:${min.toString().padStart(2, '0')}</div>` };
-        }
-    },
         editable: true,
         selectable: true,
-        
-        eventContent: function(arg) {
-          const isSelected = multiSelectIds.has(getEvId(arg.event));
-          const extraClass = isSelected ? 'event-selected-style' : '';
-          return { 
-            html: `<div class="event-inner ${extraClass}" style="background-color: ${arg.event.backgroundColor}">
-                    <div class="event-time">${arg.timeText}</div>
-                    <div class="event-title">${arg.event.title}</div>
-                    <div class="event-teacher">👤 ${arg.event.extendedProps.teacher || ''}</div>
-                   </div>` 
-          };
+
+        dayHeaderContent: (arg) => {
+            const date = arg.date;
+            const dayName = ['週日','週一','週二','週三','週四','週五','週六'][date.getDay()];
+            return { html: `<div style="font-weight:bold;">${date.getMonth()+1}/${date.getDate()}</div><div style="font-size:12px;">(${dayName})</div>` };
         },
 
-        eventChange: () => updateToCloud(),
-        eventRemove: () => updateToCloud(),
+        slotLabelContent: (arg) => {
+            const hour = arg.date.getHours();
+            const min = arg.date.getMinutes();
+            const ampm = hour >= 12 ? '下午' : '上午';
+            const dH = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+            if (min === 0) return { html: `<div class="hour-label">${ampm}${dH}時</div>` };
+            return { html: `<div class="minute-label">${dH}:${min.toString().padStart(2,'0')}</div>` };
+        },
 
+        resources: [
+            { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
+            { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
+        ],
+
+        eventContent: (arg) => {
+            const isSelected = multiSelectIds.has(getEvId(arg.event));
+            const extraClass = isSelected ? 'event-selected-style' : '';
+            return { 
+                html: `<div class="event-inner ${extraClass}" style="background-color: ${arg.event.backgroundColor}">
+                        <div class="event-time">${arg.timeText}</div>
+                        <div class="event-title">${arg.event.title}</div>
+                        <div class="event-teacher">👤 ${arg.event.extendedProps.teacher || ''}</div>
+                       </div>` 
+            };
+        },
+
+        eventChange: updateToCloud,
+        eventRemove: updateToCloud,
+
+        // AI 解析按鈕點擊事件 (確保在 calendar 初始化後綁定)
         select: function(info) {
-          if (copiedEventsBatch.length > 0) {
-            if (confirm(`貼上已複製的 ${copiedEventsBatch.length} 堂課？`)) {
-              const baseTime = info.start;
-              copiedEventsBatch.forEach(data => {
+            const title = prompt('學生姓名：');
+            if (title) {
+                const teacher = prompt('導師姓名：', '以琳老師');
                 calendar.addEvent({
-                  ...data,
-                  start: new Date(baseTime.getTime() + data.offset),
-                  end: new Date(baseTime.getTime() + data.offset + data.duration),
-                  resourceId: info.resource ? info.resource.id : data.resourceId
+                    title: title, start: info.startStr, end: info.endStr,
+                    resourceId: info.resource.id, 
+                    extendedProps: { teacher: teacher || '以琳老師' },
+                    backgroundColor: (teacher && teacher.includes('JK')) ? '#10b981' : '#6366f1'
                 });
-              });
-              updateToCloud();
-              calendar.unselect();
-              return;
+                updateToCloud();
             }
-          }
-          const title = prompt('學生姓名：');
-          if (title) {
-            const teacher = prompt('導師姓名：', '以琳老師');
-            calendar.addEvent({
-              title: title, start: info.startStr, end: info.endStr,
-              resourceId: info.resource.id, extendedProps: { teacher: teacher || '以琳老師' },
-              backgroundColor: (teacher && teacher !== '以琳老師') ? '#10b981' : '#6366f1'
-            });
-            updateToCloud();
-          }
-          calendar.unselect();
-        },
-
-        eventClick: function(info) {
-          info.jsEvent.preventDefault();
-          selectedEventInfo = info.event;
-          const menu = document.getElementById('custom-menu');
-          menu.style.display = 'block';
-          menu.style.left = info.jsEvent.clientX + 'px';
-          menu.style.top = info.jsEvent.clientY + 'px';
-          
-          const closeMenu = (e) => { 
-            if(!menu.contains(e.target)) { 
-              menu.style.display = 'none'; 
-              document.removeEventListener('mousedown', closeMenu); 
-            } 
-          };
-          setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
-        },
-
-resources: [
-        { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
-        { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
-    ],
-      });
-
-      // 功能控制
-      window.handleAction = function(action) {
-        if (!selectedEventInfo) return;
-        const evId = getEvId(selectedEventInfo);
-
-        if (action === 'toggleSelect') {
-          multiSelectIds.has(evId) ? multiSelectIds.delete(evId) : multiSelectIds.add(evId);
-          calendar.render();
-        } else if (action === 'copy') {
-          const isMulti = multiSelectIds.has(evId);
-          const targets = isMulti ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [selectedEventInfo];
-          targets.sort((a,b) => a.start - b.start);
-          const startRef = targets[0].start;
-          copiedEventsBatch = targets.map(ev => ({
-            title: ev.title, offset: ev.start - startRef, duration: ev.end - ev.start,
-            resourceId: ev.getResources()[0]?.id, extendedProps: {...ev.extendedProps},
-            backgroundColor: ev.backgroundColor
-          }));
-          alert(`已複製 ${targets.length} 堂課`);
-          multiSelectIds.clear();
-          calendar.render();
-        } else if (action === 'delete') {
-          const isMulti = multiSelectIds.has(evId);
-          const targets = isMulti ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [selectedEventInfo];
-          if (confirm(`確定刪除這 ${targets.length} 堂課？`)) {
-            targets.forEach(e => e.remove());
-            multiSelectIds.clear();
-            updateToCloud();
-          }
+            calendar.unselect();
         }
-        document.getElementById('custom-menu').style.display = 'none';
-      };
-
-      // 雲端同步
-      eventRef.on('value', (snap) => {
-        calendar.removeAllEvents();
-        calendar.addEventSource(snap.val() || []);
-      });
-
-      function updateToCloud() {
-        const events = calendar.getEvents().map(e => ({
-          title: e.title, start: e.startStr, end: e.endStr,
-          resourceId: e.getResources()[0]?.id,
-          extendedProps: e.extendedProps,
-          backgroundColor: e.backgroundColor || '#6366f1'
-        }));
-        eventRef.set(events);
-      }
-
-      // AI 解析
-document.getElementById('parse-btn').addEventListener('click', function() {
-    const inputArea = document.getElementById('ai-text-input');
-    const text = inputArea.value.trim();
-    
-    if (!text) {
-        alert("請先輸入訊息內容");
-        return;
-    }
-
-    console.log("正在解析內容..."); // 用於除錯
-
-    // 原有的解析邏輯
-    const nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
-    const name = nameMatch ? nameMatch[1] : "新學生";
-    const dateMatches = text.match(/(\d{1,2})月(\d{1,2})日/g);
-    const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
-
-    if (dateMatches && timeMatch) {
-        const startT = timeMatch[1].replace('：', ':');
-        const endT = timeMatch[2].replace('：', ':');
-        
-        dateMatches.forEach(dStr => {
-            const m = dStr.match(/(\d{1,2})月(\d{1,2})日/);
-            // 獲取目前日曆對象 (假設您的變數名是 calendar)
-            calendar.addEvent({
-                title: name,
-                start: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${startT.padStart(5,'0')}:00`,
-                end: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${endT.padStart(5,'0')}:00`,
-                // 根據文字自動分配房間
-                resourceId: text.includes('大廳') ? 'R1' : (text.includes('細房') ? 'R2' : (text.includes('18') ? 'R3' : (text.includes('12') ? 'R4' : 'R5'))),
-                extendedProps: { teacher: text.match(/導師\s*[|｜]\s*(\S+)/)?.[1] || '以琳老師' },
-                backgroundColor: text.includes('JK') ? '#10b981' : '#6366f1'
-            });
-        });
-        
-        updateToCloud(); // 同步到 Firebase
-        inputArea.value = ""; // 清空輸入框
-        alert("同步成功！");
-    } else {
-        alert("無法識別日期或時間，請檢查格式。");
-    }
-});
-
-      calendar.render();
     });
-</script>
+
+    // 綁定 AI 解析按鈕
+    document.getElementById('parse-btn').addEventListener('click', function() {
+        const text = document.getElementById('ai-text-input').value.trim();
+        if (!text) return;
+
+        const nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
+        const name = nameMatch ? nameMatch[1] : "新學生";
+        const dateMatches = text.match(/(\d{1,2})月(\d{1,2})日/g);
+        const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
+
+        if (dateMatches && timeMatch) {
+            const startT = timeMatch[1].replace('：', ':');
+            const endT = timeMatch[2].replace('：', ':');
+            
+            dateMatches.forEach(dStr => {
+                const m = dStr.match(/(\d{1,2})月(\d{1,2})日/);
+                const teacherName = text.includes('JK') ? 'JK老師' : '以琳老師';
+                const bgColor = text.includes('JK') ? '#10b981' : '#6366f1';
+
+                calendar.addEvent({
+                    title: name,
+                    start: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${startT.padStart(5,'0')}:00`,
+                    end: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${endT.padStart(5,'0')}:00`,
+                    resourceId: text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5'))),
+                    extendedProps: { teacher: teacherName },
+                    backgroundColor: bgColor
+                });
+            });
+            updateToCloud();
+            document.getElementById('ai-text-input').value = "";
+            alert("同步成功！");
+        } else {
+            alert("解析失敗，請確認內容包含日期(x月x日)與時間段(00:00-00:00)");
+        }
+    });
+
+    // 從 Firebase 載入資料
+    eventRef.on('value', (snap) => {
+        calendar.removeAllEvents();
+        if (snap.val()) calendar.addEventSource(snap.val());
+    });
+
+    calendar.render();
+});
 </body>
 </html>
