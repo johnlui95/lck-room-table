@@ -20,18 +20,24 @@
   
   #calendar { max-width: 100%; height: 100vh; background: #fff; padding: 10px; }
 
-  /* 🔴 自定義彈出選單樣式 */
+  /* 🔴 自定義選單 */
   #custom-menu {
     display: none; position: fixed; z-index: 10000;
     background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-    width: 160px; border: 1px solid #e2e8f0; overflow: hidden;
+    width: 180px; border: 1px solid #e2e8f0; overflow: hidden;
   }
   .menu-item {
     padding: 12px 15px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9;
     display: flex; align-items: center; transition: background 0.2s;
   }
   .menu-item:hover { background: #f8fafc; }
-  .menu-item:last-child { border-bottom: none; color: #ef4444; }
+  
+  /* ✨ 選中狀態的視覺效果 */
+  .event-selected-style {
+    border: 3px solid #facc15 !important; /* 金色邊框 */
+    box-shadow: 0 0 10px rgba(250, 204, 21, 0.8) !important;
+    z-index: 100 !important;
+  }
 
   .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; }
   .minute-label { font-size: 11px; color: #94a3b8; }
@@ -49,10 +55,11 @@
 <body>
 
   <div id="custom-menu">
+    <div class="menu-item" onclick="handleAction('toggleSelect')">✅ 選取 / 取消</div>
     <div class="menu-item" onclick="handleAction('editName')">✏️ 修改學生名</div>
     <div class="menu-item" onclick="handleAction('editTeacher')">👤 修改老師名</div>
     <div class="menu-item" onclick="handleAction('copy')">📋 複製課堂</div>
-    <div class="menu-item" onclick="handleAction('delete')">🗑️ 刪除課堂</div>
+    <div class="menu-item" style="color:red;" onclick="handleAction('delete')">🗑️ 刪除 (含選中)</div>
   </div>
 
   <div id="smart-input-panel">
@@ -81,7 +88,8 @@
     const eventRef = db.ref('bookings');
 
     let copiedEvent = null;
-    let selectedEventInfo = null;
+    let selectedEventInfo = null; 
+    let multiSelectIds = new Set(); // 儲存被選中的課堂 ID
 
     document.addEventListener('DOMContentLoaded', function() {
       var calendarEl = document.getElementById('calendar');
@@ -92,7 +100,7 @@
           center: 'title',
           right: 'resourceTimeGridDay,resourceTimeGridWeek'
         },
-        buttonText: { today: '今天', resourceTimeGridDay: '日視圖', resourceTimeGridWeek: '週視圖' },
+        buttonText: { today: '今天', resourceTimeGridDay: '日', resourceTimeGridWeek: '週' },
         locale: 'zh-tw',
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
         datesAboveResources: true,
@@ -104,6 +112,13 @@
         hiddenDays: [ 0 ],
         selectable: true,
         editable: true,
+
+        // 渲染時檢查是否應該套用選中樣式
+        eventDidMount: function(info) {
+          if (multiSelectIds.has(info.event.id || info.event.startStr + info.event.title)) {
+            info.el.classList.add('event-selected-style');
+          }
+        },
 
         slotLabelContent: function(arg) {
           let mins = arg.date.getMinutes();
@@ -133,22 +148,16 @@
           if (copiedEvent) {
             if (confirm(`要貼上已複製的「${copiedEvent.title}」嗎？`)) {
               calendar.addEvent({
-                title: copiedEvent.title,
-                start: info.startStr,
-                end: info.endStr,
-                resourceId: info.resource.id,
-                extendedProps: copiedEvent.extendedProps,
+                title: copiedEvent.title, start: info.startStr, end: info.endStr,
+                resourceId: info.resource.id, extendedProps: copiedEvent.extendedProps,
                 backgroundColor: copiedEvent.backgroundColor
               });
-              updateToCloud();
-              calendar.unselect();
-              return;
+              updateToCloud(); calendar.unselect(); return;
             }
           }
           var title = prompt('學生姓名：');
           if (title) {
             var teacher = prompt('導師姓名：', '以琳老師');
-            // 如果不是預設老師，使用綠色，否則使用紫色
             var color = (teacher && teacher !== '以琳老師') ? '#10b981' : '#6366f1';
             calendar.addEvent({
               title: title, start: info.startStr, end: info.endStr,
@@ -167,11 +176,8 @@
           menu.style.display = 'block';
           menu.style.left = info.jsEvent.clientX + 'px';
           menu.style.top = info.jsEvent.clientY + 'px';
-          const closeMenu = () => {
-            menu.style.display = 'none';
-            document.removeEventListener('click', closeMenu);
-          };
-          setTimeout(() => document.addEventListener('click', closeMenu), 50);
+          const closeMenu = (e) => { if(!menu.contains(e.target)) { menu.style.display = 'none'; document.removeEventListener('mousedown', closeMenu); } };
+          setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
         },
 
         resources: [
@@ -180,28 +186,48 @@
         ]
       });
 
+      // 🟡 處理選單動作（新增多選邏輯）
       window.handleAction = function(action) {
         if (!selectedEventInfo) return;
-        if (action === 'editName') {
-          const newName = prompt('新學生姓名：', selectedEventInfo.title);
-          if (newName) selectedEventInfo.setProp('title', newName);
+        const eventId = selectedEventInfo.id || selectedEventInfo.startStr + selectedEventInfo.title;
+
+        if (action === 'toggleSelect') {
+          const el = selectedEventInfo.el;
+          if (multiSelectIds.has(eventId)) {
+            multiSelectIds.delete(eventId);
+            el.classList.remove('event-selected-style');
+          } else {
+            multiSelectIds.add(eventId);
+            el.classList.add('event-selected-style');
+          }
+        } else if (action === 'editName') {
+          const n = prompt('新學生姓名：', selectedEventInfo.title);
+          if (n) selectedEventInfo.setProp('title', n);
         } else if (action === 'editTeacher') {
-          const newTeacher = prompt('新老師姓名：', selectedEventInfo.extendedProps.teacher);
-          if (newTeacher) {
-            selectedEventInfo.setExtendedProp('teacher', newTeacher);
-            // 修改老師名時也同步更新顏色
-            var newColor = (newTeacher !== '以琳老師') ? '#10b981' : '#6366f1';
-            selectedEventInfo.setProp('backgroundColor', newColor);
+          const t = prompt('新老師姓名：', selectedEventInfo.extendedProps.teacher);
+          if (t) {
+            const batch = multiSelectIds.has(eventId) ? calendar.getEvents().filter(e => multiSelectIds.has(e.id || e.startStr + e.title)) : [selectedEventInfo];
+            batch.forEach(ev => {
+              ev.setExtendedProp('teacher', t);
+              ev.setProp('backgroundColor', (t !== '以琳老師' ? '#10b981' : '#6366f1'));
+            });
           }
         } else if (action === 'copy') {
-          copiedEvent = {
-            title: selectedEventInfo.title,
-            extendedProps: selectedEventInfo.extendedProps,
-            backgroundColor: selectedEventInfo.backgroundColor
-          };
-          alert(`已複製「${copiedEvent.title}」，點擊空白處可貼上。`);
+          copiedEvent = { title: selectedEventInfo.title, extendedProps: selectedEventInfo.extendedProps, backgroundColor: selectedEventInfo.backgroundColor };
+          alert(`已複製，點擊空白處可貼上。`);
         } else if (action === 'delete') {
-          if (confirm(`確定刪除「${selectedEventInfo.title}」？`)) selectedEventInfo.remove();
+          const isMulti = multiSelectIds.has(eventId);
+          const count = isMulti ? multiSelectIds.size : 1;
+          if (confirm(`確定刪除這 ${count} 堂課嗎？`)) {
+            if (isMulti) {
+              calendar.getEvents().forEach(ev => {
+                if (multiSelectIds.has(ev.id || ev.startStr + ev.title)) ev.remove();
+              });
+              multiSelectIds.clear();
+            } else {
+              selectedEventInfo.remove();
+            }
+          }
         }
         updateToCloud();
         document.getElementById('custom-menu').style.display = 'none';
@@ -223,51 +249,36 @@
         eventRef.set(events);
       }
 
-      // ✨ 修正後的 AI 解析邏輯
+      // AI 解析
       document.getElementById('parse-btn').onclick = function() {
         const text = document.getElementById('ai-text-input').value;
         if (!text) return;
-
-        // 1. 解析姓名
         let nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
         let name = nameMatch ? nameMatch[1] : text.split('\n')[0].substring(0, 3);
-
-        // 2. 解析導師 (這就是之前出錯的地方，現在會正確讀取變數)
         let teacher = "以琳老師";
         const teacherMatch = text.match(/導師\s*[｜|:：]\s*([^\s\n]+)/);
-        if (teacherMatch) {
-          teacher = teacherMatch[1].trim();
-        }
-
+        if (teacherMatch) teacher = teacherMatch[1].trim();
         const dateMatches = text.match(/(\d{1,2})月(\d{1,2})日/g);
         const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
-
         if (dateMatches && timeMatch) {
           const startTime = timeMatch[1].replace('：', ':');
           const endTime = timeMatch[2].replace('：', ':');
           let currentYear = new Date().getFullYear();
-          
-          // 根據老師決定顏色
           let color = (teacher !== '以琳老師') ? '#10b981' : '#6366f1';
-
           dateMatches.forEach(dateStr => {
             const m = dateStr.match(/(\d{1,2})月(\d{1,2})日/);
             let rId = text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5')));
-            
             calendar.addEvent({
-              title: name,
-              start: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${startTime.padStart(5,'0')}:00`,
+              title: name, start: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${startTime.padStart(5,'0')}:00`,
               end: `${currentYear}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T${endTime.padStart(5,'0')}:00`,
-              resourceId: rId, 
-              extendedProps: { teacher: teacher }, // ✅ 這裡現在會使用解析出來的 teacher 變數
-              backgroundColor: color // ✅ 自動套用顏色
+              resourceId: rId, extendedProps: { teacher: teacher }, backgroundColor: color
             });
           });
-          updateToCloud();
-          document.getElementById('ai-text-input').value = "";
+          updateToCloud(); document.getElementById('ai-text-input').value = "";
         }
       };
 
+      // 面板拖拽
       const panel = document.getElementById('smart-input-panel');
       const header = document.getElementById('panel-header');
       const toggleBtn = document.getElementById('toggle-btn');
