@@ -10,8 +10,8 @@
   
 #smart-input-panel {
     position: fixed; 
-    top: 20px; 
-    left: 20px; /* 改為 left 方便計算位移 */
+    top: 200px; 
+    left: 200px; /* 改為 left 方便計算位移 */
     width: 320px; 
     z-index: 10001; /* 確保在自定義選單之上 */
     background: #fff; 
@@ -72,6 +72,9 @@
 
   <div id='calendar'></div>
   
+
+  
+<script>
 document.getElementById('toggle-btn').onclick = function() {
     const content = document.getElementById('panel-content');
     if (content.style.display === 'none') {
@@ -83,7 +86,6 @@ document.getElementById('toggle-btn').onclick = function() {
     }
 };
   
-<script>
   // 在你的 script 標籤內加入以下邏輯
 const panel = document.getElementById('smart-input-panel');
 const header = document.getElementById('panel-header');
