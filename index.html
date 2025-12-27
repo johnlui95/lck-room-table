@@ -100,14 +100,17 @@
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
         
         // 🔴 關鍵修正：將房間置於日期之下 (5間房間並列)
-        datesAboveResources: false, 
+        datesAboveResources: true, 
         
-        dayHeaderContent: function(arg) {
-            const date = arg.date;
-            const dayName = ['週日','週一','週二','週三','週四','週五','週六'][date.getDay()];
-            const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-            return { html: `<div style="font-weight:bold; font-size:14px;">${dateStr}</div><div style="font-size:12px; opacity:0.8;">(${dayName})</div>` };
-        },
+dayHeaderContent: function(arg) {
+        const date = arg.date;
+        const dayName = ['週日','週一','週二','週三','週四','週五','週六'][date.getDay()];
+        const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+        return { 
+          html: `<div style="font-weight:bold; font-size:15px; color:#1e293b;">${dateStr}</div>
+                 <div style="font-size:12px; color:#64748b;">(${dayName})</div>` 
+        };
+    },
 
         // 🟢 時間軸優化 (對齊圖片樣式)
         slotDuration: '00:15:00',
@@ -115,15 +118,20 @@
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
         allDaySlot: false,
-        slotLabelContent: function(arg) {
-            const hour = arg.date.getHours();
-            const min = arg.date.getMinutes();
-            const ampm = hour >= 12 ? '下午' : '上午';
-            const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-            if (min === 0) return { html: `<div class="hour-label">${ampm}${displayHour}時</div>` };
-            return { html: `<div class="minute-label">${displayHour}:${min.toString().padStart(2,'0')}</div>` };
-        },
-
+slotLabelContent: function(arg) {
+        const hour = arg.date.getHours();
+        const min = arg.date.getMinutes();
+        const ampm = hour >= 12 ? '下午' : '上午';
+        let displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+        
+        if (min === 0) {
+            // 整點顯示：上午8時
+            return { html: `<div class="hour-label" style="font-weight:bold;">${ampm}${displayHour}時</div>` };
+        } else {
+            // 刻度顯示：上午8:15
+            return { html: `<div class="minute-label" style="font-size:11px; color:#94a3b8; opacity:0.8;">${ampm}${displayHour}:${min.toString().padStart(2, '0')}</div>` };
+        }
+    },
         editable: true,
         selectable: true,
         
@@ -189,10 +197,10 @@
           setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
         },
 
-        resources: [
-          { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
-          { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
-        ]
+resources: [
+        { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
+        { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
+    ],
       });
 
       // 功能控制
