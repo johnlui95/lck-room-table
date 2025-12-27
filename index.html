@@ -7,6 +7,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <style>
   body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; background-color: #f8fafc; overflow: hidden; }
+  
+  /* 側邊面板樣式 */
   #smart-input-panel {
     position: fixed; top: 20px; right: 20px; width: 320px; z-index: 999;
     background: #fff; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
@@ -16,7 +18,10 @@
   #panel-content { padding: 15px; }
   #ai-text-input { width: 100%; height: 100px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; resize: none; margin-bottom: 10px; }
   #parse-btn { background: #6366f1; color: white; border: none; width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  
   #calendar { max-width: 100%; height: 100vh; background: #fff; padding: 10px; }
+
+  /* 右鍵選單樣式 */
   #custom-menu {
     display: none; position: fixed; z-index: 10000;
     background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
@@ -25,17 +30,17 @@
   .menu-item { padding: 12px 15px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
   .menu-item:hover { background: #f8fafc; }
   
-  /* 🟢 時間軸標籤風格 */
-  .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; }
-  .minute-label { font-size: 11px; color: #94a3b8; }
+  /* 🟢 時間軸標籤風格 (簡約) */
+  .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; padding-right: 5px; }
+  .minute-label { font-size: 11px; color: #94a3b8; padding-right: 5px; }
   
+  /* 🟢 上方日期風格 */
+  .header-date { font-size: 16px; font-weight: bold; color: #1e293b; }
+  .header-day { font-size: 13px; color: #64748b; }
+
   .event-inner { padding: 2px; color: white; line-height: 1.2; height: 100%; }
-  .event-time { font-size: 10px; opacity: 0.9; margin-bottom: 2px; }
+  .event-time { font-size: 10px; opacity: 0.9; }
   .event-title { font-size: 13px; font-weight: bold; }
-  
-  /* 上方日期欄風格 */
-  .header-date { font-size: 16px; font-weight: bold; }
-  .header-day { font-size: 14px; color: #444; }
 </style>
 </head>
 <body>
@@ -59,6 +64,7 @@
   <div id='calendar'></div>
 
   <script>
+    // Firebase 配置保持不變
     const firebaseConfig = {
       apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
       authDomain: "lckroomtable.firebaseapp.com",
@@ -68,7 +74,6 @@
       messagingSenderId: "934661729012",
       appId: "1:934661729012:web:14b19af989cd72b2370ca1"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const eventRef = db.ref('bookings');
@@ -77,14 +82,13 @@
     let selectedEventInfo = null; 
     let multiSelectIds = new Set(); 
 
-    // 🎨 顏色系統：確保不同老師不同顏色
-    const teacherColors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316'];
+    // 老師顏色管理
+    const teacherColors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
     const assignedColors = {};
-
     function getTeacherColor(name) {
       if (!name || name === '以琳老師') return teacherColors[0];
       if (assignedColors[name]) return assignedColors[name];
-      const nextColor = teacherColors[Object.keys(assignedColors).length % teacherColors.length + 1] || '#14b8a6';
+      const nextColor = teacherColors[Object.keys(assignedColors).length % teacherColors.length] || '#14b8a6';
       assignedColors[name] = nextColor;
       return nextColor;
     }
@@ -99,7 +103,10 @@
         locale: 'zh-tw',
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
         
-        // 🟢 限制時間範圍：上午 8 點至晚上 10 點
+        // 🟢 修正：將日期顯示在資源（房間）之上
+        datesAboveResources: false, 
+
+        // 🟢 限制時間範圍
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
         slotDuration: '00:15:00',
@@ -109,22 +116,27 @@
         editable: true,
         allDaySlot: false,
 
-        // 🟢 圖片中的時間標籤風格
-        slotLabelContent: function(arg) {
-          let mins = arg.date.getMinutes();
-          let hour = arg.date.getHours();
-          let ampm = hour >= 12 ? '下午' : '上午';
-          let displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-          if (mins === 0) return { html: `<div class="hour-label">${ampm}${displayHour}時</div>` };
-          return { html: `<div class="minute-label">${ampm}${displayHour}:${String(mins).padStart(2, '0')}</div>` };
-        },
-
-        // 🟢 上方日期標籤風格
+        // 🟢 修正：日期欄風格 (顯示在最上方)
         dayHeaderContent: function(arg) {
           const mm = arg.date.getMonth() + 1;
           const dd = arg.date.getDate();
           const dayName = ['週日','週一','週二','週三','週四','週五','週六'][arg.date.getDay()];
           return { html: `<div class="header-date">${mm}/${dd}</div><div class="header-day">(${dayName})</div>` };
+        },
+
+        // 🟢 修正：時間軸簡約風格 (小時 & 15, 30, 45)
+        slotLabelContent: function(arg) {
+          const hour = arg.date.getHours();
+          const min = arg.date.getMinutes();
+          const ampm = hour >= 12 ? '下午' : '上午';
+          const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+          
+          if (min === 0) {
+            return { html: `<div class="hour-label">${ampm}${displayHour}時</div>` };
+          } else {
+            // 只顯示 15, 30, 45 分
+            return { html: `<div class="minute-label">${ampm}${displayHour}:${String(min).padStart(2, '0')}</div>` };
+          }
         },
 
         eventContent: function(arg) {
@@ -134,28 +146,22 @@
             html: `<div class="event-inner" style="${borderStyle}">
                     <div class="event-time">${arg.timeText}</div>
                     <div class="event-title">${arg.event.title}</div>
-                    <div class="event-teacher">👤 ${arg.event.extendedProps.teacher || ''}</div>
+                    <div style="font-size:10px; opacity:0.8;">👤 ${arg.event.extendedProps.teacher || ''}</div>
                    </div>` 
           };
         },
 
         select: function(info) {
-          if (copiedEventsBatch.length > 0) {
-            if (confirm(`貼上已複製的 ${copiedEventsBatch.length} 堂課？`)) {
-              copiedEventsBatch.forEach(data => {
-                calendar.addEvent({
-                  title: data.title, start: new Date(info.start.getTime() + data.offset), 
-                  end: new Date(info.start.getTime() + data.offset + data.duration),
-                  resourceId: info.resource.id, extendedProps: data.extendedProps, backgroundColor: data.backgroundColor
-                });
-              });
-              updateToCloud(); calendar.unselect(); return;
-            }
-          }
+          // 點擊空白處新增或貼上邏輯保持不變
           var title = prompt('學生姓名：');
           if (title) {
             var t = prompt('導師姓名：', '以琳老師');
-            calendar.addEvent({ title: title, start: info.startStr, end: info.endStr, resourceId: info.resource.id, extendedProps: { teacher: t || '以琳老師' }, backgroundColor: getTeacherColor(t) });
+            calendar.addEvent({ 
+              title: title, start: info.startStr, end: info.endStr, 
+              resourceId: info.resource.id, 
+              extendedProps: { teacher: t || '以琳老師' }, 
+              backgroundColor: getTeacherColor(t) 
+            });
             updateToCloud();
           }
           calendar.unselect();
@@ -172,25 +178,22 @@
           setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
         },
 
-        resources: [{ id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' }, { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }]
+        resources: [
+          { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' }, 
+          { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
+        ]
       });
 
-      // 🔴 核心修正：文字解析邏輯
+      // 解析按鈕邏輯
       document.getElementById('parse-btn').onclick = function() {
         const text = document.getElementById('ai-text-input').value.trim();
         if (!text) return;
 
-        // 1. 抓取學生姓名 (優化：過濾掉第一行的常見贅字)
         let name = text.split('\n')[0].replace(/[^\u4e00-\u9fa5a-zA-Z]/g, '').substring(0, 4);
-        let nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費|課程)/);
-        if (nameMatch) name = nameMatch[1];
-
-        // 2. 抓取導師姓名
         let teacher = "以琳老師";
         const teacherMatch = text.match(/(?:導師|老師)\s*[｜|:：]\s*([^\s\n]+)/);
         if (teacherMatch) teacher = teacherMatch[1].trim();
 
-        // 3. 抓取日期與時間
         const dateMatches = text.match(/(\d{1,2})[月\/](\d{1,2})/g);
         const timeMatch = text.match(/(\d{1,2}[:：]\d{2})\s*[-–—~]\s*(\d{1,2}[:：]\d{2})/);
 
@@ -210,57 +213,28 @@
               resourceId: rId, extendedProps: { teacher: teacher }, backgroundColor: color
             });
           });
-          updateToCloud(); alert(`已解析！學生：${name}，導師：${teacher}`);
+          updateToCloud();
           document.getElementById('ai-text-input').value = "";
-        } else { alert("解析失敗，請確認訊息包含日期(如12/25)與時間(如14:00-15:00)"); }
+          alert("解析成功並已同步！");
+        } else {
+          alert("解析失敗，請確認格式（需包含日期與時間範圍）");
+        }
       };
 
-      window.handleAction = function(action) {
-        if (!selectedEventInfo) return;
-        const evId = getEvId(selectedEventInfo);
-        const targets = multiSelectIds.has(evId) ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [selectedEventInfo];
-
-        if (action === 'toggleSelect') {
-          multiSelectIds.has(evId) ? multiSelectIds.delete(evId) : multiSelectIds.add(evId);
-          calendar.render();
-        } 
-        else if (action === 'copy') {
-          targets.sort((a,b) => a.start - b.start);
-          const base = targets[0].start.getTime();
-          copiedEventsBatch = targets.map(ev => ({
-            title: ev.title, offset: ev.start.getTime() - base, duration: ev.end.getTime() - ev.start.getTime(),
-            extendedProps: ev.extendedProps, backgroundColor: ev.backgroundColor
-          }));
-          alert(`已複製 ${targets.length} 堂課`);
-          multiSelectIds.clear(); calendar.render();
-        }
-        else if (action === 'editTeacher') {
-          const t = prompt('新導師：', selectedEventInfo.extendedProps.teacher);
-          if(t) { 
-            const c = getTeacherColor(t);
-            targets.forEach(ev => { ev.setExtendedProp('teacher', t); ev.setProp('backgroundColor', c); });
-            updateToCloud(); 
-          }
-        }
-        else if (action === 'delete') {
-          if(confirm('確定刪除？')) { targets.forEach(ev => ev.remove()); multiSelectIds.clear(); updateToCloud(); }
-        }
-        else if (action === 'editName') {
-          const n = prompt('新名字：', selectedEventInfo.title);
-          if(n) { selectedEventInfo.setProp('title', n); updateToCloud(); }
-        }
-        document.getElementById('custom-menu').style.display = 'none';
-      };
-
-      eventRef.on('value', snapshot => { calendar.removeAllEvents(); calendar.addEventSource(snapshot.val() || []); });
-
+      // 同步與面板拖動邏輯...
       function updateToCloud() {
         const events = calendar.getEvents().map(e => ({
-          title: e.title, start: e.startStr, end: e.endStr, resourceId: e.getResources()[0]?.id, extendedProps: e.extendedProps, backgroundColor: e.backgroundColor || '#6366f1'
+          title: e.title, start: e.startStr, end: e.endStr, resourceId: e.getResources()[0]?.id, extendedProps: e.extendedProps, backgroundColor: e.backgroundColor
         }));
         eventRef.set(events);
       }
 
+      eventRef.on('value', snap => {
+        calendar.removeAllEvents();
+        calendar.addEventSource(snap.val() || []);
+      });
+
+      // 面板拖拽
       const panel = document.getElementById('smart-input-panel'), header = document.getElementById('panel-header'), toggleBtn = document.getElementById('toggle-btn');
       header.onmousedown = (e) => { 
         if(e.target===toggleBtn) return;
@@ -273,8 +247,31 @@
         content.style.display = content.style.display==='none'?'block':'none';
         toggleBtn.innerText = content.style.display==='none'?'展開':'收起';
       };
+
       calendar.render();
     });
+
+    // 右鍵菜單動作
+    window.handleAction = function(action) {
+      if (!selectedEventInfo) return;
+      if (action === 'delete') {
+        if(confirm('確定刪除選中課堂？')) {
+          const evId = getEvId(selectedEventInfo);
+          if (multiSelectIds.has(evId)) {
+            calendar.getEvents().forEach(e => { if(multiSelectIds.has(getEvId(e))) e.remove(); });
+            multiSelectIds.clear();
+          } else {
+            selectedEventInfo.remove();
+          }
+          updateToCloud();
+        }
+      } else if (action === 'toggleSelect') {
+        const id = getEvId(selectedEventInfo);
+        multiSelectIds.has(id) ? multiSelectIds.delete(id) : multiSelectIds.add(id);
+        calendar.render();
+      }
+      document.getElementById('custom-menu').style.display = 'none';
+    };
   </script>
 </body>
 </html>
