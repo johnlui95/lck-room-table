@@ -20,28 +20,24 @@
   
   #calendar { max-width: 100%; height: 100vh; background: #fff; padding: 10px; }
 
-  /* 🔴 自定義選單 */
   #custom-menu {
     display: none; position: fixed; z-index: 10000;
     background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     width: 180px; border: 1px solid #e2e8f0; overflow: hidden;
   }
-  .menu-item {
-    padding: 12px 15px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9;
-    display: flex; align-items: center; transition: background 0.2s;
-  }
+  .menu-item { padding: 12px 15px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; }
   .menu-item:hover { background: #f8fafc; }
   
-  /* ✨ 選中狀態的視覺效果 */
-  .event-selected-style {
-    border: 3px solid #facc15 !important; /* 金色邊框 */
-    box-shadow: 0 0 10px rgba(250, 204, 21, 0.8) !important;
-    z-index: 100 !important;
+  /* ✨ 選中狀態的視覺效果 - 直接作用於 event 容器 */
+  .fc-event-selected {
+    border: 3px solid #facc15 !important;
+    box-shadow: 0 0 12px rgba(250, 204, 21, 0.9) !important;
+    z-index: 99 !important;
   }
 
   .hour-label { font-weight: bold; color: #1e293b; font-size: 14px; }
   .minute-label { font-size: 11px; color: #94a3b8; }
-  .event-inner { padding: 2px; color: white; line-height: 1.2; }
+  .event-inner { padding: 2px; color: white; line-height: 1.2; height: 100%; }
   .event-time { font-size: 10px; opacity: 0.9; margin-bottom: 2px; }
   .event-title { font-size: 13px; font-weight: bold; display: block; }
   .event-teacher { font-size: 11px; margin-top: 2px; display: flex; align-items: center; }
@@ -89,7 +85,12 @@
 
     let copiedEvent = null;
     let selectedEventInfo = null; 
-    let multiSelectIds = new Set(); // 儲存被選中的課堂 ID
+    let multiSelectIds = new Set(); 
+
+    // 取得唯一辨識碼的補助函數
+    function getEvId(ev) {
+      return ev.startStr + "_" + ev.title + "_" + (ev.getResources()[0]?.id || "");
+    }
 
     document.addEventListener('DOMContentLoaded', function() {
       var calendarEl = document.getElementById('calendar');
@@ -113,27 +114,13 @@
         selectable: true,
         editable: true,
 
-        // 渲染時檢查是否應該套用選中樣式
-        eventDidMount: function(info) {
-          if (multiSelectIds.has(info.event.id || info.event.startStr + info.event.title)) {
-            info.el.classList.add('event-selected-style');
-          }
-        },
-
-        slotLabelContent: function(arg) {
-          let mins = arg.date.getMinutes();
-          if (mins === 0) {
-            let hour = arg.date.getHours();
-            let ampm = hour >= 12 ? '下午' : '上午';
-            let displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-            return { html: `<span class="hour-label">${ampm}${displayHour}時</span>` };
-          }
-          return { html: `<span class="minute-label">${mins}</span>` };
-        },
-
         eventContent: function(arg) {
+          const isSelected = multiSelectIds.has(getEvId(arg.event));
+          // 如果被選中，直接在渲染時加上邊框樣式
+          const borderStyle = isSelected ? 'border: 3px solid #facc15; box-shadow: 0 0 8px rgba(250,204,21,0.8);' : '';
+          
           return { 
-            html: `<div class="event-inner">
+            html: `<div class="event-inner" style="${borderStyle}">
                     <div class="event-time">${arg.timeText}</div>
                     <div class="event-title">${arg.event.title}</div>
                     <div class="event-teacher">👤 ${arg.event.extendedProps.teacher || ''}</div>
@@ -176,7 +163,13 @@
           menu.style.display = 'block';
           menu.style.left = info.jsEvent.clientX + 'px';
           menu.style.top = info.jsEvent.clientY + 'px';
-          const closeMenu = (e) => { if(!menu.contains(e.target)) { menu.style.display = 'none'; document.removeEventListener('mousedown', closeMenu); } };
+          
+          const closeMenu = (e) => { 
+            if(!menu.contains(e.target)) { 
+              menu.style.display = 'none'; 
+              document.removeEventListener('mousedown', closeMenu); 
+            } 
+          };
           setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
         },
 
@@ -186,50 +179,58 @@
         ]
       });
 
-      // 🟡 處理選單動作（新增多選邏輯）
       window.handleAction = function(action) {
         if (!selectedEventInfo) return;
-        const eventId = selectedEventInfo.id || selectedEventInfo.startStr + selectedEventInfo.title;
+        const evId = getEvId(selectedEventInfo);
 
         if (action === 'toggleSelect') {
-          const el = selectedEventInfo.el;
-          if (multiSelectIds.has(eventId)) {
-            multiSelectIds.delete(eventId);
-            el.classList.remove('event-selected-style');
+          if (multiSelectIds.has(evId)) {
+            multiSelectIds.delete(evId);
           } else {
-            multiSelectIds.add(eventId);
-            el.classList.add('event-selected-style');
+            multiSelectIds.add(evId);
           }
-        } else if (action === 'editName') {
+          calendar.render(); // ✨ 重要：強制日曆重新渲染以顯示邊框
+        } 
+        else if (action === 'editName') {
           const n = prompt('新學生姓名：', selectedEventInfo.title);
-          if (n) selectedEventInfo.setProp('title', n);
-        } else if (action === 'editTeacher') {
+          if (n) {
+            selectedEventInfo.setProp('title', n);
+            updateToCloud();
+          }
+        } 
+        else if (action === 'editTeacher') {
           const t = prompt('新老師姓名：', selectedEventInfo.extendedProps.teacher);
           if (t) {
-            const batch = multiSelectIds.has(eventId) ? calendar.getEvents().filter(e => multiSelectIds.has(e.id || e.startStr + e.title)) : [selectedEventInfo];
+            const batch = multiSelectIds.has(evId) 
+              ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) 
+              : [selectedEventInfo];
+            
             batch.forEach(ev => {
               ev.setExtendedProp('teacher', t);
               ev.setProp('backgroundColor', (t !== '以琳老師' ? '#10b981' : '#6366f1'));
             });
+            updateToCloud();
           }
-        } else if (action === 'copy') {
+        } 
+        else if (action === 'copy') {
           copiedEvent = { title: selectedEventInfo.title, extendedProps: selectedEventInfo.extendedProps, backgroundColor: selectedEventInfo.backgroundColor };
-          alert(`已複製，點擊空白處可貼上。`);
-        } else if (action === 'delete') {
-          const isMulti = multiSelectIds.has(eventId);
+          alert(`已複製「${selectedEventInfo.title}」`);
+        } 
+        else if (action === 'delete') {
+          const isMulti = multiSelectIds.has(evId);
           const count = isMulti ? multiSelectIds.size : 1;
           if (confirm(`確定刪除這 ${count} 堂課嗎？`)) {
             if (isMulti) {
               calendar.getEvents().forEach(ev => {
-                if (multiSelectIds.has(ev.id || ev.startStr + ev.title)) ev.remove();
+                if (multiSelectIds.has(getEvId(ev))) ev.remove();
               });
               multiSelectIds.clear();
             } else {
               selectedEventInfo.remove();
             }
+            updateToCloud();
           }
         }
-        updateToCloud();
         document.getElementById('custom-menu').style.display = 'none';
       };
 
@@ -278,7 +279,6 @@
         }
       };
 
-      // 面板拖拽
       const panel = document.getElementById('smart-input-panel');
       const header = document.getElementById('panel-header');
       const toggleBtn = document.getElementById('toggle-btn');
