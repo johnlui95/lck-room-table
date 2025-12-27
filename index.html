@@ -8,11 +8,19 @@
 <style>
   body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; background-color: #f8fafc; overflow: hidden; }
   
-  #smart-input-panel {
-    position: fixed; top: 20px; right: 20px; width: 320px; z-index: 1000;
-    background: #fff; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-    border: 1px solid #e2e8f0; overflow: hidden;
-  }
+#smart-input-panel {
+    position: fixed; 
+    top: 20px; 
+    left: 20px; /* 改為 left 方便計算位移 */
+    width: 320px; 
+    z-index: 10001; /* 確保在自定義選單之上 */
+    background: #fff; 
+    border-radius: 12px; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    border: 1px solid #e2e8f0; 
+    overflow: hidden;
+    user-select: none; /* 防止移動時選取到文字 */
+}
   #panel-header { background: #6366f1; color: white; padding: 10px 15px; cursor: move; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
   #panel-content { padding: 15px; }
   #ai-text-input { width: 100%; height: 100px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; resize: vertical; margin-bottom: 10px; }
@@ -65,6 +73,50 @@
   <div id='calendar'></div>
 
 <script>
+  // 在你的 script 標籤內加入以下邏輯
+const panel = document.getElementById('smart-input-panel');
+const header = document.getElementById('panel-header');
+
+let isDragging = false;
+let currentX;
+let currentY;
+let initialX;
+let initialY;
+let xOffset = 0;
+let yOffset = 0;
+
+header.addEventListener('mousedown', dragStart);
+document.addEventListener('mousemove', drag);
+document.addEventListener('mouseup', dragEnd);
+
+function dragStart(e) {
+    initialX = e.clientX - xOffset;
+    initialY = e.clientY - yOffset;
+    if (e.target === header || header.contains(e.target)) {
+        isDragging = true;
+    }
+}
+
+function drag(e) {
+    if (isDragging) {
+        e.preventDefault();
+        currentX = e.clientX - initialX;
+        currentY = e.clientY - initialY;
+        xOffset = currentX;
+        yOffset = currentY;
+        setTranslate(currentX, currentY, panel);
+    }
+}
+
+function setTranslate(xPos, yPos, el) {
+    el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+}
+
+function dragEnd() {
+    initialX = currentX;
+    initialY = currentY;
+    isDragging = false;
+}
     const firebaseConfig = {
       apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
       authDomain: "lckroomtable.firebaseapp.com",
