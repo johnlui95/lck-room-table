@@ -164,13 +164,14 @@ window.handleAction = function(action) {
 
     if (action === 'toggleSelect') multiSelectIds.delete(evId);
     if (action === 'editName') { const n = prompt('修改學生名：', ev.title); if(n) ev.setProp('title', n); }
-    if (action === 'editTeacher') { 
-        const t = prompt('修改老師：', ev.extendedProps.teacher); 
-        if(t) { 
-            ev.setExtendedProp('teacher', t); 
-            ev.setProp('backgroundColor', t.includes('JK') ? '#10b981' : '#6366f1'); 
-        } 
-    }
+if (action === 'editTeacher') { 
+    const t = prompt('修改老師：', ev.extendedProps.teacher); 
+    if(t) { 
+        ev.setExtendedProp('teacher', t); 
+        // 即使是手動輸入的新老師，也會自動拿到顏色
+        ev.setProp('backgroundColor', getTeacherColor(t)); 
+    } 
+}
     if (action === 'copy') {
         const targets = calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e)));
         const finalT = targets.length > 0 ? targets : [ev];
@@ -245,14 +246,27 @@ calendar = new FullCalendar.Calendar(calendarEl, {
 
         // ... 其餘 eventContent, eventClick, select 等邏輯保持不變
 
-        eventContent: (arg) => {
-            const isSelected = multiSelectIds.has(getEvId(arg.event));
-            return { html: `<div class="event-inner ${isSelected ? 'event-selected-style' : ''}" style="background-color:${arg.event.backgroundColor}">
-                <div class="event-time">${arg.timeText}</div>
-                <div class="event-title">${arg.event.title}</div>
-                <div class="event-teacher">👤 ${arg.event.extendedProps.teacher || ''}</div>
-            </div>` };
-        },
+eventContent: (arg) => {
+    const isSelected = multiSelectIds.has(getEvId(arg.event));
+    const teacher = arg.event.extendedProps.teacher;
+    // 使用自動分配函式
+  
+// ... 在解析出 teacher 名稱後 ...
+const bgColor = getTeacherColor(teacher); // 自動獲取或分配新顏色
+
+calendar.addEvent({
+    title: nameMatch ? nameMatch[1] : "新學生",
+    // ... 其他參數 ...
+    extendedProps: { teacher: teacher },
+    backgroundColor: bgColor // 設定分配到的顏色
+});
+    
+    return { html: `<div class="event-inner ${isSelected ? 'event-selected-style' : ''}" style="background-color:${bgColor}">
+        <div class="event-time">${arg.timeText}</div>
+        <div class="event-title">${arg.event.title}</div>
+        <div class="event-teacher">👤 ${teacher || ''}</div>
+    </div>` };
+},
 
         eventClick: function(info) {
             info.jsEvent.preventDefault();
@@ -325,6 +339,29 @@ calendar = new FullCalendar.Calendar(calendarEl, {
 
     calendar.render();
 });
+
+    // 1. 定義預設色盤 (您可以隨意增加喜歡的顏色)
+const colorPalette = [
+    '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', 
+    '#06b6d4', '#f43f5e', '#14b8a6', '#f97316', '#3b82f6'
+];
+
+// 2. 用來儲存「老師 -> 顏色」對應關係的物件
+let teacherColorMap = {};
+let colorIndex = 0;
+
+// 3. 自動分配顏色的函式
+function getTeacherColor(teacherName) {
+    if (!teacherName) return '#94a3b8'; // 無老師時回傳灰色
+    
+    // 如果這位老師還沒分配過顏色
+    if (!teacherColorMap[teacherName]) {
+        // 從色盤中按順序取色，超過色盤長度則循環使用
+        teacherColorMap[teacherName] = colorPalette[colorIndex % colorPalette.length];
+        colorIndex++;
+    }
+    return teacherColorMap[teacherName];
+}
 
 // 面板拖拽與收合邏輯
 const panel = document.getElementById('smart-input-panel'), header = document.getElementById('panel-header');
