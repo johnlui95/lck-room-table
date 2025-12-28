@@ -208,10 +208,13 @@ calendar = new FullCalendar.Calendar(calendarEl, {
         locale: 'zh-tw',
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
         
-        // --- 關鍵修改：房間在日期之下 ---
+        // --- 關鍵修改：隱藏 all-day 欄位 ---
+        allDaySlot: false,
+
+        // 房間在日期之下
         datesAboveResources: true, 
 
-        // --- 關鍵修改：限制時間為上午 8 點至晚上 10 點 ---
+        // 限制時間為上午 8 點至晚上 10 點
         slotMinTime: '08:00:00',
         slotMaxTime: '22:00:00',
 
@@ -220,7 +223,7 @@ calendar = new FullCalendar.Calendar(calendarEl, {
         slotDuration: '00:15:00',
         slotLabelInterval: '00:15:00',
         
-        // --- 簡約時間風格 (小時、15、30、45) ---
+        // 簡約時間風格 (小時、15、30、45)
         slotLabelContent: (arg) => {
             const hour = arg.date.getHours();
             const min = arg.date.getMinutes();
@@ -228,7 +231,7 @@ calendar = new FullCalendar.Calendar(calendarEl, {
             return { html: `<div class="minute-label">${min}</div>` };
         },
 
-        // 日期標頭格式 (12/28 週日)
+        // 日期標頭格式
         dayHeaderContent: (arg) => {
             const date = arg.date;
             const days = ['週日','週一','週二','週三','週四','週五','週六'];
