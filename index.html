@@ -136,13 +136,32 @@ window.handleAction = function(action) {
             calendar.render();
             break;
 
-        case 'delete':
+case 'delete':
+            // 1. 判斷目前點擊的課堂是否在「多選名單」中
             const isDelMulti = multiSelectIds.has(evId);
-            const delTargets = isDelMulti ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [ev];
+            let delTargets = [];
+
+            if (isDelMulti) {
+                // 如果是在多選狀態，抓取所有 ID 在集合中的事件
+                delTargets = calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e)));
+            } else {
+                // 如果只是單選（沒勾選就直接點刪除），只刪除當前這一個
+                delTargets = [ev];
+            }
+
+            if (delTargets.length === 0) return;
+
             if (confirm(`確定刪除這 ${delTargets.length} 堂課？`)) {
-                delTargets.forEach(e => e.remove());
+                // 2. 執行刪除（使用 map 預先固定對象，避免 remove() 時影響 filter 结果）
+                delTargets.forEach(e => {
+                    e.remove(); 
+                });
+
+                // 3. 清空選取集合並同步雲端
                 multiSelectIds.clear();
+                calendar.render(); // 強制重繪確保視覺更新
                 updateToCloud();
+                console.log("多重刪除成功");
             }
             break;
     }
