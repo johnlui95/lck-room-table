@@ -303,27 +303,56 @@ eventContent: (arg) => {
     });
 
     // AI 解析綁定
-    document.getElementById('parse-btn').onclick = function() {
-        const text = document.getElementById('ai-text-input').value;
-        const nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
-        const dateMatch = text.match(/(\d{1,2})月(\d{1,2})日/g);
-        const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
-        if (dateMatch && timeMatch) {
-            const teacherMatch = text.match(/[|｜]\s*(\S+?)(?:老師)?(?:\n|$|\s)/);
-            const teacher = teacherMatch ? (teacherMatch[1].includes('老師')?teacherMatch[1]:teacherMatch[1]+'老師') : (text.includes('JK')?'JK老師':'以琳老師');
-            dateMatch.forEach(d => {
-                const m = d.match(/(\d{1,2})月(\d{1,2})日/);
-                calendar.addEvent({
-                    title: nameMatch ? nameMatch[1] : "新學生",
-                    start: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${timeMatch[1].replace('：',':').padStart(5,'0')}:00`,
-                    end: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${timeMatch[2].replace('：',':').padStart(5,'0')}:00`,
-                    resourceId: text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5'))),
-                    extendedProps: { teacher: teacher }, backgroundColor: teacher.includes('JK') ? '#10b981' : '#6366f1'
-                });
+document.getElementById('parse-btn').onclick = function() {
+    const text = document.getElementById('ai-text-input').value;
+    const nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
+    const dateMatch = text.match(/(\d{1,2})月(\d{1,2})日/g);
+    const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
+
+    if (dateMatch && timeMatch) {
+        const teacherMatch = text.match(/[|｜]\s*(\S+?)(?:老師)?(?:\n|$|\s)/);
+        const teacher = teacherMatch ? (teacherMatch[1].includes('老師') ? teacherMatch[1] : teacherMatch[1] + '老師') : '以琳老師';
+        
+        // 獲取當前系統的年份與月份
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 12
+
+        dateMatch.forEach(d => {
+            const m = d.match(/(\d{1,2})月(\d{1,2})日/);
+            const inputMonth = parseInt(m[1]);
+            const inputDay = parseInt(m[2]);
+
+            // --- 跨年邏輯修正 ---
+            // 如果現在是 12 月，但輸入的月份是 1 月或 2 月，年份自動設為明年 (2026)
+            let targetYear = currentYear;
+            if (currentMonth === 12 && inputMonth < 3) {
+                targetYear = currentYear + 1;
+            } 
+            // 反之，如果現在是 1 月，但輸入 12 月，則視為去年 (2025)
+            else if (currentMonth === 1 && inputMonth === 12) {
+                targetYear = currentYear - 1;
+            }
+            // ------------------
+
+            const startStr = `${targetYear}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${timeMatch[1].replace('：',':').padStart(5,'0')}:00`;
+            const endStr = `${targetYear}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${timeMatch[2].replace('：',':').padStart(5,'0')}:00`;
+
+            calendar.addEvent({
+                title: nameMatch ? nameMatch[1] : "新學生",
+                start: startStr,
+                end: endStr,
+                resourceId: text.includes('大廳') ? 'R1' : (text.includes('細房') ? 'R2' : (text.includes('18') ? 'R3' : (text.includes('12') ? 'R4' : 'R5'))),
+                extendedProps: { teacher: teacher },
+                backgroundColor: getTeacherColor(teacher)
             });
-            updateToCloud(); alert("同步成功");
-        }
-    };
+        });
+        updateToCloud();
+        alert("同步成功！已排入 " + targetYear + " 年課程。");
+    } else {
+        alert("解析失敗，請確認訊息格式（需包含日期與時間）");
+    }
+};
 
     // Firebase 實時同步
     eventRef.on('value', snap => {
