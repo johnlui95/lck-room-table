@@ -198,22 +198,45 @@ window.handleAction = function(action) {
         multiSelectIds.clear();
     }
     
-    if (action === 'delete') {
-        // 1. 獲取所有選中的事件物件
-        const delT = calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e)));
-        // 2. 如果沒有多選，則只處理當前右鍵點擊的這一個
-        const finalD = delT.length > 0 ? delT : [ev];
+if (action === 'delete') {
+        // 1. 取得畫面上所有的事件
+        const allEvents = calendar.getEvents();
         
-        if (confirm(`確定要刪除這 ${finalD.length} 堂選中的課堂嗎？`)) {
-            // 3. 執行刪除（暫時不觸發 updateToCloud）
+        // 2. 篩選出 ID 存在於 multiSelectIds 中的事件物件
+        // 如果沒有多選，則只抓取當前點擊的那一個 (ev)
+        let finalD = allEvents.filter(e => multiSelectIds.has(getEvId(e)));
+        if (finalD.length === 0) finalD = [ev];
+        
+        if (confirm(`確定要刪除這 ${finalD.length} 堂課堂嗎？`)) {
+            // 💡 關鍵：先停止 Firebase 監聽，避免刪除過程中雲端數據跳回
+            eventRef.off('value'); 
+
+            // 3. 執行刪除
             finalD.forEach(e => {
-                // 為了避免觸發日曆的 eventRemove 導致重複同步，可以先移除 id
-                e.remove();
+                e.remove(); 
             });
-            // 4. 清空選取狀態
+
+            // 4. 清空選取紀錄
             multiSelectIds.clear();
-            // 5. 統一同步到 Firebase
-            updateToCloud();
+
+            // 5. 立即同步到雲端
+            const remainingEvents = calendar.getEvents().map(e => ({
+                title: e.title, 
+                start: e.startStr, 
+                end: e.endStr,
+                resourceId: e.getResources()[0]?.id, 
+                extendedProps: e.extendedProps,
+                backgroundColor: e.backgroundColor
+            }));
+            
+            eventRef.set(remainingEvents).then(() => {
+                // 6. 同步成功後，重啟 Firebase 監聽
+                eventRef.on('value', snap => {
+                    calendar.removeAllEvents();
+                    if (snap.val()) calendar.addEventSource(Object.values(snap.val()));
+                });
+                alert("刪除成功並已同步雲端");
+            });
         }
     }
 
