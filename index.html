@@ -162,35 +162,62 @@ window.handleAction = function(action) {
     const ev = selectedEventInfo;
     const evId = getEvId(ev);
 
-    if (action === 'toggleSelect') multiSelectIds.delete(evId);
-    if (action === 'editName') { const n = prompt('修改學生名：', ev.title); if(n) ev.setProp('title', n); }
-if (action === 'editTeacher') { 
-    const t = prompt('修改老師：', ev.extendedProps.teacher); 
-    if(t) { 
-        ev.setExtendedProp('teacher', t); 
-        // 即使是手動輸入的新老師，也會自動拿到顏色
-        ev.setProp('backgroundColor', getTeacherColor(t)); 
-    } 
-}
+    if (action === 'toggleSelect') {
+        multiSelectIds.delete(evId);
+    }
+    
+    if (action === 'editName') { 
+        const n = prompt('修改學生名：', ev.title); 
+        if(n) ev.setProp('title', n); 
+    }
+    
+    if (action === 'editTeacher') { 
+        const t = prompt('修改老師：', ev.extendedProps.teacher); 
+        if(t) { 
+            ev.setExtendedProp('teacher', t); 
+            ev.setProp('backgroundColor', getTeacherColor(t)); 
+        } 
+    }
+    
     if (action === 'copy') {
+        // 找到所有被勾選（有黃色框）的課堂
         const targets = calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e)));
+        // 如果沒有勾選任何課堂，就只複製當前點擊的那一個
         const finalT = targets.length > 0 ? targets : [ev];
+        
         finalT.sort((a, b) => a.start - b.start);
         const ref = finalT[0].start;
         copiedEventsBatch = finalT.map(e => ({
-            title: e.title, offset: e.start - ref, duration: e.end - e.start,
-            extendedProps: {...e.extendedProps}, backgroundColor: e.backgroundColor
+            title: e.title, 
+            offset: e.start - ref, 
+            duration: e.end - e.start,
+            extendedProps: {...e.extendedProps}, 
+            backgroundColor: e.backgroundColor
         }));
         alert(`已複製 ${finalT.length} 堂課，點擊空白處可貼上。`);
         multiSelectIds.clear();
     }
+    
     if (action === 'delete') {
+        // 1. 獲取所有選中的事件物件
         const delT = calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e)));
+        // 2. 如果沒有多選，則只處理當前右鍵點擊的這一個
         const finalD = delT.length > 0 ? delT : [ev];
-        if (confirm(`刪除 ${finalD.length} 堂課？`)) finalD.forEach(e => e.remove());
-        multiSelectIds.clear();
+        
+        if (confirm(`確定要刪除這 ${finalD.length} 堂選中的課堂嗎？`)) {
+            // 3. 執行刪除（暫時不觸發 updateToCloud）
+            finalD.forEach(e => {
+                // 為了避免觸發日曆的 eventRemove 導致重複同步，可以先移除 id
+                e.remove();
+            });
+            // 4. 清空選取狀態
+            multiSelectIds.clear();
+            // 5. 統一同步到 Firebase
+            updateToCloud();
+        }
     }
-    updateToCloud();
+
+    // 統一渲染畫面並隱藏選單
     calendar.render();
     document.getElementById('custom-menu').style.display = 'none';
 };
