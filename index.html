@@ -339,36 +339,71 @@ eventClick: function(info) {
 
         // AI 解析按鈕點擊事件 (確保在 calendar 初始化後綁定)
 select: function(info) {
-    // --- 貼上邏輯 ---
+    // 1. 檢查是否有東西要貼上 (保留您原本的複製貼上邏輯)
     if (copiedEventsBatch.length > 0) {
         if (confirm(`要在這裡貼上已複製的 ${copiedEventsBatch.length} 堂課嗎？`)) {
-            const baseTime = info.start; // 您點擊的那個格子的時間
-
+            const baseTime = info.start;
             copiedEventsBatch.forEach(data => {
                 calendar.addEvent({
                     title: data.title,
-                    // 關鍵：點擊的時間 + 課堂原本的位移
                     start: new Date(baseTime.getTime() + data.offset),
                     end: new Date(baseTime.getTime() + data.offset + data.duration),
-                    // 關鍵：貼到您點擊的那個房間 (Resource)
                     resourceId: info.resource ? info.resource.id : 'R5',
                     extendedProps: data.extendedProps,
                     backgroundColor: data.backgroundColor
                 });
             });
-
             updateToCloud();
-            calendar.unselect();
-            // 貼上後清空暫存區（如果您想連續貼上多次，可以把下面這行刪掉）
-            copiedEventsBatch = []; 
-            return; // 結束，不執行下方的新增邏輯
-        } else {
-            // 如果用戶取消貼上，清空暫存區，恢復正常新增功能
-            copiedEventsBatch = [];
             calendar.unselect();
             return;
         }
     }
+
+    // 2. 🔴 新功能：判斷是否為「拖曳多選」
+    // 如果選取的範圍大於 15 分鐘（即不是單純點一下），我們就執行「框選課堂」
+    const durationMin = (info.end - info.start) / 1000 / 60;
+    
+    if (durationMin > 15) {
+        // 找出所有在選取時間範圍內、且在同一個房間的課堂
+        const allEvents = calendar.getEvents();
+        let foundAny = false;
+
+        allEvents.forEach(ev => {
+            const evStart = ev.start;
+            const evResId = ev.getResources()[0]?.id;
+
+            // 判斷條件：時間重疊 且 房間相同
+            if (evStart >= info.start && evStart < info.end && evResId === info.resource.id) {
+                const evId = getEvId(ev);
+                multiSelectIds.add(evId);
+                foundAny = true;
+            }
+        });
+
+        if (foundAny) {
+            calendar.render(); // 重新渲染，顯示黃色邊框
+            calendar.unselect();
+            return; // 結束，不彈出新增學生的視窗
+        }
+    }
+
+    // 3. 如果只是單點一下（或範圍內沒課堂），執行原本的「新增課堂」邏輯
+    const title = prompt('學生姓名：');
+    if (title) {
+        const teacher = prompt('導師姓名：', '以琳老師');
+        const isJK = teacher && teacher.includes('JK');
+        calendar.addEvent({
+            title: title,
+            start: info.startStr,
+            end: info.endStr,
+            resourceId: info.resource.id,
+            extendedProps: { teacher: isJK ? 'JK老師' : (teacher || '以琳老師') },
+            backgroundColor: isJK ? '#10b981' : '#6366f1'
+        });
+        updateToCloud();
+    }
+    calendar.unselect();
+},
 
     // --- 原本的新增新課堂邏輯 (只有在沒東西可貼時才執行) ---
     const title = prompt('學生姓名：');
