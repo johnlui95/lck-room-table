@@ -184,23 +184,25 @@ window.handleAction = function(action) {
 // --- 3. 初始化日曆 ---
 document.addEventListener('DOMContentLoaded', function() {
 calendar = new FullCalendar.Calendar(calendarEl, {
-    initialView: 'resourceTimeGridWeek',
+    // 1. 確保初始視圖名稱正確
+    initialView: 'resourceTimeGridWeek', 
+    
+    // 2. 修正上方工具欄按鈕 (right 部分)
+    headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'resourceTimeGridDay,resourceTimeGridWeek' // 必須包含這兩個名稱才有按鈕
+    },
+
     locale: 'zh-tw',
     schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
     
-    // --- 關鍵修改 1：房間在日期之下 ---
+    // 3. 關鍵：房間在日期之下
     datesAboveResources: true, 
-    
-    selectable: true,
-    editable: true,
-    
-    // 時間軸設定
-    slotDuration: '00:15:00',      // 每格 15 分鐘
-    slotLabelInterval: '00:15:00', // 標籤每 15 分鐘出現一次
-    slotMinTime: '08:00:00',
-    slotMaxTime: '22:00:00',
-    
-    // --- 關鍵修改 2：簡約時間風格 ---
+
+    // 4. 時間軸簡約風格 (小時與分鐘)
+    slotDuration: '00:15:00',
+    slotLabelInterval: '00:15:00',
     slotLabelContent: (arg) => {
         const hour = arg.date.getHours();
         const min = arg.date.getMinutes();
@@ -210,7 +212,7 @@ calendar = new FullCalendar.Calendar(calendarEl, {
         return { html: `<div style="font-size:11px; color:#94a3b8;">${min}</div>` };
     },
 
-    // 日期標頭格式
+    // 5. 日期標頭顯示方式
     dayHeaderContent: (arg) => {
         const date = arg.date;
         const days = ['週日','週一','週二','週三','週四','週五','週六'];
