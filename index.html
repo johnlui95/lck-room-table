@@ -405,23 +405,7 @@ select: function(info) {
     calendar.unselect();
 },
 
-    // --- 原本的新增新課堂邏輯 (只有在沒東西可貼時才執行) ---
-    const title = prompt('學生姓名：');
-    if (title) {
-        const teacher = prompt('導師姓名：', '以琳老師');
-        const isJK = teacher && teacher.includes('JK');
-        calendar.addEvent({
-            title: title,
-            start: info.startStr,
-            end: info.endStr,
-            resourceId: info.resource.id,
-            extendedProps: { teacher: isJK ? 'JK老師' : (teacher || '以琳老師') },
-            backgroundColor: isJK ? '#10b981' : '#6366f1'
-        });
-        updateToCloud();
-    }
-    calendar.unselect();
-},
+
     });
 
     // 綁定 AI 解析按鈕
