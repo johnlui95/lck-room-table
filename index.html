@@ -248,24 +248,18 @@ calendar = new FullCalendar.Calendar(calendarEl, {
 
 eventContent: (arg) => {
     const isSelected = multiSelectIds.has(getEvId(arg.event));
-    const teacher = arg.event.extendedProps.teacher;
-    // 使用自動分配函式
-  
-// ... 在解析出 teacher 名稱後 ...
-const bgColor = getTeacherColor(teacher); // 自動獲取或分配新顏色
-
-calendar.addEvent({
-    title: nameMatch ? nameMatch[1] : "新學生",
-    // ... 其他參數 ...
-    extendedProps: { teacher: teacher },
-    backgroundColor: bgColor // 設定分配到的顏色
-});
+    const teacher = arg.event.extendedProps.teacher || '';
     
-    return { html: `<div class="event-inner ${isSelected ? 'event-selected-style' : ''}" style="background-color:${bgColor}">
-        <div class="event-time">${arg.timeText}</div>
-        <div class="event-title">${arg.event.title}</div>
-        <div class="event-teacher">👤 ${teacher || ''}</div>
-    </div>` };
+    // 優先使用事件已存的顏色，若無則現場分配
+    const bgColor = arg.event.backgroundColor || getTeacherColor(teacher);
+    
+    return { 
+        html: `<div class="event-inner ${isSelected ? 'event-selected-style' : ''}" style="background-color:${bgColor}">
+            <div class="event-time">${arg.timeText}</div>
+            <div class="event-title">${arg.event.title}</div>
+            <div class="event-teacher">👤 ${teacher}</div>
+        </div>` 
+    };
 },
 
         eventClick: function(info) {
