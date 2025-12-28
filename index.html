@@ -198,7 +198,7 @@ window.handleAction = function(action) {
 document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('calendar');
 
-    calendar = new FullCalendar.Calendar(calendarEl, {
+calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'resourceTimeGridWeek', 
         headerToolbar: {
             left: 'prev,next today',
@@ -207,13 +207,20 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         locale: 'zh-tw',
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
+        
+        // --- 關鍵修改：房間在日期之下 ---
         datesAboveResources: true, 
+
+        // --- 關鍵修改：限制時間為上午 8 點至晚上 10 點 ---
+        slotMinTime: '08:00:00',
+        slotMaxTime: '22:00:00',
+
         selectable: true,
         editable: true,
         slotDuration: '00:15:00',
         slotLabelInterval: '00:15:00',
         
-        // 簡約時間風格
+        // --- 簡約時間風格 (小時、15、30、45) ---
         slotLabelContent: (arg) => {
             const hour = arg.date.getHours();
             const min = arg.date.getMinutes();
@@ -221,6 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return { html: `<div class="minute-label">${min}</div>` };
         },
 
+        // 日期標頭格式 (12/28 週日)
         dayHeaderContent: (arg) => {
             const date = arg.date;
             const days = ['週日','週一','週二','週三','週四','週五','週六'];
@@ -231,6 +239,8 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
             { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
         ],
+
+        // ... 其餘 eventContent, eventClick, select 等邏輯保持不變
 
         eventContent: (arg) => {
             const isSelected = multiSelectIds.has(getEvId(arg.event));
