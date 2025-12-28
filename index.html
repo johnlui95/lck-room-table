@@ -85,7 +85,70 @@
   <div id='calendar'></div>
   
   <script>
+// 功能控制中心
+window.handleAction = function(action) {
+    if (!selectedEventInfo) return;
+    const ev = selectedEventInfo;
+    const evId = getEvId(ev);
 
+    switch (action) {
+        case 'toggleSelect':
+            multiSelectIds.has(evId) ? multiSelectIds.delete(evId) : multiSelectIds.add(evId);
+            calendar.render();
+            break;
+
+        case 'editName':
+            const newName = prompt('修改學生姓名：', ev.title);
+            if (newName) {
+                ev.setProp('title', newName);
+                updateToCloud();
+            }
+            break;
+
+        case 'editTeacher':
+            const newTeacher = prompt('修改導師姓名：', ev.extendedProps.teacher);
+            if (newTeacher) {
+                ev.setExtendedProp('teacher', newTeacher);
+                // 自動根據老師名字更新顏色
+                const bgColor = newTeacher.includes('JK') ? '#10b981' : '#6366f1';
+                ev.setProp('backgroundColor', bgColor);
+                updateToCloud();
+            }
+            break;
+
+        case 'copy':
+            const isMulti = multiSelectIds.has(evId);
+            const targets = isMulti ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [ev];
+            targets.sort((a,b) => a.start - b.start);
+            const startRef = targets[0].start;
+            
+            copiedEventsBatch = targets.map(e => ({
+                title: e.title,
+                offset: e.start - startRef,
+                duration: e.end - e.start,
+                resourceId: e.getResources()[0]?.id,
+                extendedProps: {...e.extendedProps},
+                backgroundColor: e.backgroundColor
+            }));
+            
+            alert(`已複製 ${targets.length} 堂課，請點擊空白處貼上。`);
+            multiSelectIds.clear();
+            calendar.render();
+            break;
+
+        case 'delete':
+            const isDelMulti = multiSelectIds.has(evId);
+            const delTargets = isDelMulti ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [ev];
+            if (confirm(`確定刪除這 ${delTargets.length} 堂課？`)) {
+                delTargets.forEach(e => e.remove());
+                multiSelectIds.clear();
+                updateToCloud();
+            }
+            break;
+    }
+    document.getElementById('custom-menu').style.display = 'none';
+};
+    
   
 // --- 全域變數定義 ---
 const firebaseConfig = {
@@ -189,6 +252,26 @@ document.addEventListener('DOMContentLoaded', function() {
         editable: true,
         selectable: true,
 
+      // 在 calendar 的設定中加入：
+eventClick: function(info) {
+    info.jsEvent.preventDefault(); // 防止瀏覽器預設行為
+    selectedEventInfo = info.event; // 紀錄目前點擊的課堂
+    
+    const menu = document.getElementById('custom-menu');
+    menu.style.display = 'block';
+    menu.style.left = info.jsEvent.clientX + 'px';
+    menu.style.top = info.jsEvent.clientY + 'px';
+    
+    // 點擊其他地方時關閉選單
+    const closeMenu = (e) => { 
+        if(!menu.contains(e.target)) { 
+            menu.style.display = 'none'; 
+            document.removeEventListener('mousedown', closeMenu); 
+        } 
+    };
+    setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
+},
+      
         dayHeaderContent: (arg) => {
             const date = arg.date;
             const dayName = ['週日','週一','週二','週三','週四','週五','週六'][date.getDay()];
