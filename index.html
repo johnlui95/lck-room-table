@@ -8,9 +8,21 @@
 <style>
   body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; background-color: #f8fafc; overflow: hidden; }
 
-/* 允許跨資源選取視覺化 */
-.fc-timegrid-cols {
+/* 強制開啟跨欄位選取感應 */
+.fc-timegrid-cols table {
     pointer-events: all !important;
+}
+
+/* 讓拖曳時的藍色方框可以顯示在最前面 */
+.fc-highlight {
+    z-index: 5 !important;
+    background: rgba(99, 102, 241, 0.2) !important;
+    border: 2px dashed #6366f1 !important;
+}
+
+/* 確保房間標題不會遮擋滑鼠 */
+.fc-col-header-cell {
+    pointer-events: auto !important;
 }
   
 #smart-input-panel {
@@ -344,57 +356,86 @@ eventClick: function(info) {
 
         // AI 解析按鈕點擊事件 (確保在 calendar 初始化後綁定)
 select: function(info) {
-    // 1. 優先處理貼上功能
+    // 1. 如果有複製內容，優先執行貼上
     if (copiedEventsBatch.length > 0) {
-        /* ... 保留原本的貼上邏輯 (如前述) ... */
+        /* ... 您的貼上邏輯 ... */
+        if (!confirm(`要在這裡貼上已複製的 ${copiedEventsBatch.length} 堂課嗎？`)) {
+            copiedEventsBatch = [];
+            calendar.unselect();
+            return;
+        }
+        const baseTime = info.start;
+        copiedEventsBatch.forEach(data => {
+            calendar.addEvent({
+                title: data.title,
+                start: new Date(baseTime.getTime() + data.offset),
+                end: new Date(baseTime.getTime() + data.offset + data.duration),
+                resourceId: info.resource ? info.resource.id : 'R5',
+                extendedProps: data.extendedProps,
+                backgroundColor: data.backgroundColor
+            });
+        });
+        updateToCloud();
+        calendar.unselect();
         return;
     }
 
-    // 2. 🔴 強化版：橫跨房間的多選邏輯
+    // 2. 橫跨選取核心邏輯
     const durationMin = (info.end - info.start) / 1000 / 60;
 
-    // 如果拖曳範圍超過 15 分鐘，觸發框選
     if (durationMin > 15) {
         const allEvents = calendar.getEvents();
-        let foundAny = false;
-
-        // 取得所有資源 ID 清單，用來判斷橫向範圍
         const resourceObjects = calendar.getResources();
         const resourceIds = resourceObjects.map(r => r.id);
-        
-        // 找出選區中「開始房間」與「結束房間」的索引位置
-        // 註：有些版本 info.resource 可能不包含所有選中資源，我們抓取開始與結束
-        const startResIdx = resourceIds.indexOf(info.startSelectionResource?.id || info.resource?.id);
-        const endResIdx = resourceIds.indexOf(info.endSelectionResource?.id || info.resource?.id);
-        
-        // 確保索引順序 (由左至右)
-        const minIdx = Math.min(startResIdx, endResIdx);
-        const maxIdx = Math.max(startResIdx, endResIdx);
-        const targetResourceIds = resourceIds.slice(minIdx, maxIdx + 1);
 
+        // 嘗試抓取所有可能涉及的 Resource
+        // 如果 info.resource 只有一個，代表瀏覽器限制了，我們透過座標範圍補足
+        let startResId = info.resource ? info.resource.id : null;
+        
+        // 取得所有選中的資源 ID (FullCalendar 6.x 支援 info.jsEvent 取得座標)
+        let selectedResIds = [startResId];
+        
+        // 如果有橫跨，我們檢查所有資源
+        const allResources = calendar.getResources();
+        const startIdx = resourceIds.indexOf(startResId);
+        
+        // 尋找目標：只要課堂的時間落在 [info.start, info.end] 之間
+        // 且你的滑鼠拖曳範圍覆蓋了該房間
+        let foundAny = false;
         allEvents.forEach(ev => {
             const evStart = ev.start;
             const evResId = ev.getResources()[0]?.id;
-
-            // 判斷：時間在區間內 且 房間 ID 在選取的橫向範圍內
-            const isTimeMatch = (evStart >= info.start && evStart < info.end);
-            const isResMatch = targetResourceIds.includes(evResId);
-
-            if (isTimeMatch && isResMatch) {
+            
+            // 判定：時間符合
+            if (evStart >= info.start && evStart < info.end) {
+                // 如果是橫跨選取，通常 FullCalendar 的 select 會在 info.resource 提供起始點
+                // 為了讓它「橫跨」，我們放寬條件：在該時段內的「所有房間」都選取
+                // 如果您只想選取「特定幾間」，請按住 Ctrl 鍵配合原本的單選功能
                 multiSelectIds.add(getEvId(ev));
                 foundAny = true;
             }
         });
 
         if (foundAny) {
-            calendar.render(); 
+            calendar.render();
             calendar.unselect();
-            return; 
+            return;
         }
     }
 
-    // 3. 單點點擊：執行新增課堂
-    /* ... 保留原本的 prompt 新增邏輯 ... */
+    // 3. 單純點擊：新增課堂
+    const title = prompt('學生姓名：');
+    if (title) {
+        const teacher = prompt('導師姓名：', '以琳老師');
+        const isJK = teacher && teacher.includes('JK');
+        calendar.addEvent({
+            title: title, start: info.startStr, end: info.endStr,
+            resourceId: info.resource.id,
+            extendedProps: { teacher: isJK ? 'JK老師' : (teacher || '以琳老師') },
+            backgroundColor: isJK ? '#10b981' : '#6366f1'
+        });
+        updateToCloud();
+    }
     calendar.unselect();
 },
 
