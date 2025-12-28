@@ -109,6 +109,7 @@ window.handleAction = function(action) {
     const evId = getEvId(ev);
 
     switch (action) {
+        
 case 'toggleSelect':
     multiSelectIds.delete(evId); // 從集合移除
     calendar.render();
