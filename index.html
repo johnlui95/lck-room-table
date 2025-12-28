@@ -111,28 +111,109 @@
   <div id='calendar'></div>
   
   <script>
+// --- 1. 核心變數與 Firebase 配置 ---
+const firebaseConfig = {
+    apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
+    authDomain: "lckroomtable.firebaseapp.com",
+    databaseURL: "https://lckroomtable-default-rtdb.firebaseio.com",
+    projectId: "lckroomtable",
+    storageBucket: "lckroomtable.firebasestorage.app",
+    messagingSenderId: "934661729012",
+    appId: "1:934661729012:web:14b19af989cd72b2370ca1"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const eventRef = db.ref('bookings');
+
+// 必須定義在 DOMContentLoaded 之外，handleAction 才能讀取
+let calendar, selectedEventInfo, copiedEventsBatch = [], multiSelectIds = new Set();
+
+// 輔助函式
+const getEvId = (ev) => ev.startStr + "_" + ev.title + "_" + (ev.getResources()[0]?.id || "");
+
+const updateToCloud = () => {
+    if (!calendar) return;
+    const events = calendar.getEvents().map(e => ({
+        title: e.title, start: e.startStr, end: e.endStr,
+        resourceId: e.getResources()[0]?.id, extendedProps: e.extendedProps,
+        backgroundColor: e.backgroundColor || '#6366f1'
+    }));
+    eventRef.set(events);
+};
+
+function showCustomMenu(info) {
+    selectedEventInfo = info.event;
+    const menu = document.getElementById('custom-menu');
+    menu.style.display = 'block';
+    menu.style.left = info.jsEvent.clientX + 'px';
+    menu.style.top = info.jsEvent.clientY + 'px';
+    const closeMenu = (e) => { 
+        if(!menu.contains(e.target)) { 
+            menu.style.display = 'none'; 
+            document.removeEventListener('mousedown', closeMenu); 
+        } 
+    };
+    setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
+}
+
+// --- 2. 選單按鈕功能 ---
+window.handleAction = function(action) {
+    if (!selectedEventInfo) return;
+    const ev = selectedEventInfo;
+    const evId = getEvId(ev);
+
+    if (action === 'toggleSelect') multiSelectIds.delete(evId);
+    if (action === 'editName') { const n = prompt('修改學生名：', ev.title); if(n) ev.setProp('title', n); }
+    if (action === 'editTeacher') { 
+        const t = prompt('修改老師：', ev.extendedProps.teacher); 
+        if(t) { 
+            ev.setExtendedProp('teacher', t); 
+            ev.setProp('backgroundColor', t.includes('JK') ? '#10b981' : '#6366f1'); 
+        } 
+    }
+    if (action === 'copy') {
+        const targets = calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e)));
+        const finalT = targets.length > 0 ? targets : [ev];
+        finalT.sort((a, b) => a.start - b.start);
+        const ref = finalT[0].start;
+        copiedEventsBatch = finalT.map(e => ({
+            title: e.title, offset: e.start - ref, duration: e.end - e.start,
+            extendedProps: {...e.extendedProps}, backgroundColor: e.backgroundColor
+        }));
+        alert(`已複製 ${finalT.length} 堂課，點擊空白處可貼上。`);
+        multiSelectIds.clear();
+    }
+    if (action === 'delete') {
+        const delT = calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e)));
+        const finalD = delT.length > 0 ? delT : [ev];
+        if (confirm(`刪除 ${finalD.length} 堂課？`)) finalD.forEach(e => e.remove());
+        multiSelectIds.clear();
+    }
+    updateToCloud();
+    calendar.render();
+    document.getElementById('custom-menu').style.display = 'none';
+};
+
+// --- 3. 初始化日曆 ---
 document.addEventListener('DOMContentLoaded', function() {
-    // 【修正 1】定義容器變數
     const calendarEl = document.getElementById('calendar');
 
     calendar = new FullCalendar.Calendar(calendarEl, {
-        // 【修正 2】確保視圖名稱包含 resource
         initialView: 'resourceTimeGridWeek', 
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
             right: 'resourceTimeGridDay,resourceTimeGridWeek'
         },
-
         locale: 'zh-tw',
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
-        
-        // 房間在日期之下
         datesAboveResources: true, 
-
-        // 時間軸簡約風格
+        selectable: true,
+        editable: true,
         slotDuration: '00:15:00',
         slotLabelInterval: '00:15:00',
+        
+        // 簡約時間風格
         slotLabelContent: (arg) => {
             const hour = arg.date.getHours();
             const min = arg.date.getMinutes();
@@ -140,20 +221,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return { html: `<div class="minute-label">${min}</div>` };
         },
 
-        // 日期標頭格式
         dayHeaderContent: (arg) => {
             const date = arg.date;
             const days = ['週日','週一','週二','週三','週四','週五','週六'];
             return { html: `<b>${date.getMonth()+1}/${date.getDate()}</b> <small>(${days[date.getDay()]})</small>` };
         },
 
-        // 資源定義
         resources: [
             { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
             { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
         ],
 
-        // 事件內容與點擊邏輯 (維持您原本的優化邏輯)
         eventContent: (arg) => {
             const isSelected = multiSelectIds.has(getEvId(arg.event));
             return { html: `<div class="event-inner ${isSelected ? 'event-selected-style' : ''}" style="background-color:${arg.event.backgroundColor}">
@@ -162,11 +240,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="event-teacher">👤 ${arg.event.extendedProps.teacher || ''}</div>
             </div>` };
         },
+
         eventClick: function(info) {
             info.jsEvent.preventDefault();
             const id = getEvId(info.event);
             multiSelectIds.has(id) ? showCustomMenu(info) : (multiSelectIds.add(id), calendar.render());
         },
+
         select: function(info) {
             if (copiedEventsBatch.length > 0) {
                 copiedEventsBatch.forEach(d => {
@@ -201,6 +281,29 @@ document.addEventListener('DOMContentLoaded', function() {
         eventRemove: updateToCloud
     });
 
+    // AI 解析綁定
+    document.getElementById('parse-btn').onclick = function() {
+        const text = document.getElementById('ai-text-input').value;
+        const nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
+        const dateMatch = text.match(/(\d{1,2})月(\d{1,2})日/g);
+        const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
+        if (dateMatch && timeMatch) {
+            const teacherMatch = text.match(/[|｜]\s*(\S+?)(?:老師)?(?:\n|$|\s)/);
+            const teacher = teacherMatch ? (teacherMatch[1].includes('老師')?teacherMatch[1]:teacherMatch[1]+'老師') : (text.includes('JK')?'JK老師':'以琳老師');
+            dateMatch.forEach(d => {
+                const m = d.match(/(\d{1,2})月(\d{1,2})日/);
+                calendar.addEvent({
+                    title: nameMatch ? nameMatch[1] : "新學生",
+                    start: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${timeMatch[1].replace('：',':').padStart(5,'0')}:00`,
+                    end: `${new Date().getFullYear()}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T${timeMatch[2].replace('：',':').padStart(5,'0')}:00`,
+                    resourceId: text.includes('大廳')?'R1':(text.includes('細房')?'R2':(text.includes('18')?'R3':(text.includes('12')?'R4':'R5'))),
+                    extendedProps: { teacher: teacher }, backgroundColor: teacher.includes('JK') ? '#10b981' : '#6366f1'
+                });
+            });
+            updateToCloud(); alert("同步成功");
+        }
+    };
+
     // Firebase 實時同步
     eventRef.on('value', snap => {
         calendar.removeAllEvents();
@@ -208,9 +311,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     calendar.render();
-    
-    // AI 解析與面板控制邏輯保持不變...
 });
+
+// 面板拖拽與收合邏輯
+const panel = document.getElementById('smart-input-panel'), header = document.getElementById('panel-header');
+let active = false, xOffset = 0, yOffset = 0, initX, initY;
+header.onmousedown = (e) => { active = true; initX = e.clientX - xOffset; initY = e.clientY - yOffset; };
+document.onmousemove = (e) => { if(active) { xOffset = e.clientX - initX; yOffset = e.clientY - initY; panel.style.transform = `translate(${xOffset}px, ${yOffset}px)`; } };
+document.onmouseup = () => active = false;
+document.getElementById('toggle-btn').onclick = function() {
+    const c = document.getElementById('panel-content');
+    c.style.display = (c.style.display === 'none' ? 'block' : 'none');
+    this.innerText = (c.style.display === 'none' ? '展開' : '收起');
+};
     </script>
 
 </body>
