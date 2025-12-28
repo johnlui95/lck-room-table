@@ -116,25 +116,36 @@ window.handleAction = function(action) {
             }
             break;
 
-        case 'copy':
-            const isMulti = multiSelectIds.has(evId);
-            const targets = isMulti ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) : [ev];
-            targets.sort((a,b) => a.start - b.start);
-            const startRef = targets[0].start;
-            
-            copiedEventsBatch = targets.map(e => ({
-                title: e.title,
-                offset: e.start - startRef,
-                duration: e.end - e.start,
-                resourceId: e.getResources()[0]?.id,
-                extendedProps: {...e.extendedProps},
-                backgroundColor: e.backgroundColor
-            }));
-            
-            alert(`已複製 ${targets.length} 堂課，請點擊空白處貼上。`);
-            multiSelectIds.clear();
-            calendar.render();
-            break;
+case 'copy':
+    const isMulti = multiSelectIds.has(evId);
+    // 找出所有要複製的對象
+    const targets = isMulti 
+        ? calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e))) 
+        : [ev];
+
+    if (targets.length === 0) return;
+
+    // 以最早開始的那堂課作為基準點 (Base Time)
+    targets.sort((a, b) => a.start - b.start);
+    const startRef = targets[0].start;
+    
+    // 儲存到暫存區
+    copiedEventsBatch = targets.map(e => ({
+        title: e.title,
+        offset: e.start - startRef, // 計算每堂課相對於基準點的時間差
+        duration: e.end - e.start, // 紀錄課堂長度
+        // 不固定 resourceId，貼上時會根據點擊位置自動分配
+        extendedProps: { ...e.extendedProps },
+        backgroundColor: e.backgroundColor
+    }));
+    
+    alert(`📋 已複製 ${targets.length} 堂課。\n提示：點擊日曆任何空白時段即可貼上。`);
+    
+    // 複製後取消黃色邊框
+    multiSelectIds.clear();
+    calendar.render();
+    break;
+        
 
 case 'delete':
             // 1. 判斷目前點擊的課堂是否在「多選名單」中
@@ -327,20 +338,55 @@ eventClick: function(info) {
         eventRemove: updateToCloud,
 
         // AI 解析按鈕點擊事件 (確保在 calendar 初始化後綁定)
-        select: function(info) {
-            const title = prompt('學生姓名：');
-            if (title) {
-                const teacher = prompt('導師姓名：', '以琳老師');
+select: function(info) {
+    // --- 貼上邏輯 ---
+    if (copiedEventsBatch.length > 0) {
+        if (confirm(`要在這裡貼上已複製的 ${copiedEventsBatch.length} 堂課嗎？`)) {
+            const baseTime = info.start; // 您點擊的那個格子的時間
+
+            copiedEventsBatch.forEach(data => {
                 calendar.addEvent({
-                    title: title, start: info.startStr, end: info.endStr,
-                    resourceId: info.resource.id, 
-                    extendedProps: { teacher: teacher || '以琳老師' },
-                    backgroundColor: (teacher && teacher.includes('JK')) ? '#10b981' : '#6366f1'
+                    title: data.title,
+                    // 關鍵：點擊的時間 + 課堂原本的位移
+                    start: new Date(baseTime.getTime() + data.offset),
+                    end: new Date(baseTime.getTime() + data.offset + data.duration),
+                    // 關鍵：貼到您點擊的那個房間 (Resource)
+                    resourceId: info.resource ? info.resource.id : 'R5',
+                    extendedProps: data.extendedProps,
+                    backgroundColor: data.backgroundColor
                 });
-                updateToCloud();
-            }
+            });
+
+            updateToCloud();
             calendar.unselect();
+            // 貼上後清空暫存區（如果您想連續貼上多次，可以把下面這行刪掉）
+            copiedEventsBatch = []; 
+            return; // 結束，不執行下方的新增邏輯
+        } else {
+            // 如果用戶取消貼上，清空暫存區，恢復正常新增功能
+            copiedEventsBatch = [];
+            calendar.unselect();
+            return;
         }
+    }
+
+    // --- 原本的新增新課堂邏輯 (只有在沒東西可貼時才執行) ---
+    const title = prompt('學生姓名：');
+    if (title) {
+        const teacher = prompt('導師姓名：', '以琳老師');
+        const isJK = teacher && teacher.includes('JK');
+        calendar.addEvent({
+            title: title,
+            start: info.startStr,
+            end: info.endStr,
+            resourceId: info.resource.id,
+            extendedProps: { teacher: isJK ? 'JK老師' : (teacher || '以琳老師') },
+            backgroundColor: isJK ? '#10b981' : '#6366f1'
+        });
+        updateToCloud();
+    }
+    calendar.unselect();
+},
     });
 
     // 綁定 AI 解析按鈕
