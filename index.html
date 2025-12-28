@@ -183,15 +183,49 @@ window.handleAction = function(action) {
 
 // --- 3. 初始化日曆 ---
 document.addEventListener('DOMContentLoaded', function() {
-    calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
-        initialView: 'resourceTimeGridWeek',
-        locale: 'zh-tw',
-        schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
-        selectable: true, editable: true, slotDuration: '00:15:00',
-        resources: [
-            { id: 'R1', title: '誠信大廳' }, { id: 'R2', title: '誠信細房' },
-            { id: 'R3', title: '嘉名Rm 18' }, { id: 'R4', title: '嘉名Rm 12' }, { id: 'R5', title: '其他' }
-        ],
+calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'resourceTimeGridWeek',
+    locale: 'zh-tw',
+    schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
+    
+    // --- 關鍵修改 1：房間在日期之下 ---
+    datesAboveResources: true, 
+    
+    selectable: true,
+    editable: true,
+    
+    // 時間軸設定
+    slotDuration: '00:15:00',      // 每格 15 分鐘
+    slotLabelInterval: '00:15:00', // 標籤每 15 分鐘出現一次
+    slotMinTime: '08:00:00',
+    slotMaxTime: '22:00:00',
+    
+    // --- 關鍵修改 2：簡約時間風格 ---
+    slotLabelContent: (arg) => {
+        const hour = arg.date.getHours();
+        const min = arg.date.getMinutes();
+        if (min === 0) {
+            return { html: `<div style="font-weight:bold; color:#1e293b;">${hour}時</div>` };
+        }
+        return { html: `<div style="font-size:11px; color:#94a3b8;">${min}</div>` };
+    },
+
+    // 日期標頭格式
+    dayHeaderContent: (arg) => {
+        const date = arg.date;
+        const days = ['週日','週一','週二','週三','週四','週五','週六'];
+        return { 
+            html: `<div style="font-weight:bold;">${date.getMonth()+1}/${date.getDate()}</div><div style="font-size:12px;">(${days[date.getDay()]})</div>` 
+        };
+    },
+
+    resources: [
+        { id: 'R1', title: '誠信大廳' }, 
+        { id: 'R2', title: '誠信細房' },
+        { id: 'R3', title: '嘉名Rm 18' }, 
+        { id: 'R4', title: '嘉名Rm 12' }, 
+        { id: 'R5', title: '其他' }
+    ],
         eventContent: (arg) => {
             const isSelected = multiSelectIds.has(getEvId(arg.event));
             return { html: `<div class="event-inner ${isSelected ? 'event-selected-style' : ''}" style="background-color:${arg.event.backgroundColor}">
