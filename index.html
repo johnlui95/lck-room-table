@@ -439,24 +439,21 @@ eventRef.on('value', snap => {
 const colorPalette = [
     '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', 
     '#06b6d4', '#f43f5e', '#14b8a6', '#f97316', '#3b82f6',
-    '#4ade80', '#fb7185', '#2dd4bf', '#fbbf24', '#a78bfa' // 新增更多顏色
+    '#22c55e', '#ef4444', '#eab308', '#a855f7', '#0ea5e9'
 ];
 
-// 2. 用來儲存「老師 -> 顏色」對應關係的物件
 let teacherColorMap = {};
 let colorIndex = 0;
 
-// 3. 自動分配顏色的函式
-function getTeacherColor(teacherName) {
-    if (!teacherName) return '#94a3b8'; // 無老師時回傳灰色
-    
-    // 如果這位老師還沒分配過顏色
-    if (!teacherColorMap[teacherName]) {
-        // 從色盤中按順序取色，超過色盤長度則循環使用
-        teacherColorMap[teacherName] = colorPalette[colorIndex % colorPalette.length];
+function getTeacherColor(name) {
+    if (!name) return '#94a3b8';
+    // 清除空格確保名字匹配
+    const cleanName = name.trim();
+    if (!teacherColorMap[cleanName]) {
+        teacherColorMap[cleanName] = colorPalette[colorIndex % colorPalette.length];
         colorIndex++;
     }
-    return teacherColorMap[teacherName];
+    return teacherColorMap[cleanName];
 }
 
 // 面板拖拽與收合邏輯
