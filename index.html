@@ -28,9 +28,10 @@
 
 /* 讓拖曳時的藍色方框可以顯示在最前面 */
 .fc-highlight {
-    z-index: 5 !important;
-    background: rgba(99, 102, 241, 0.2) !important;
+    z-index: 10 !important;
+    background: rgba(99, 102, 241, 0.3) !important;
     border: 2px dashed #6366f1 !important;
+  pointer-events: none;
 }
 
 /* 確保房間標題不會遮擋滑鼠 */
@@ -318,34 +319,7 @@ calendar = new FullCalendar.Calendar(calendarEl, {
         slotDuration: '00:15:00',
         slotLabelInterval: '00:15:00',
 
-viewDidMount: function(arg) {
-    // 監聽日曆容器的右鍵事件
-    arg.el.addEventListener('contextmenu', function(ev) {
-        // 如果右鍵點擊的是現有課堂，我們在 eventDidMount 已處理過 stopPropagation
-        // 走到這裡表示點擊的是空白處
-        ev.preventDefault();
 
-        // 檢查是否有正在選取的範圍 (FullCalendar 的 highlight 元素是否存在)
-        const hasSelection = document.querySelector('.fc-highlight');
-        
-        const title = prompt(hasSelection ? '已選取範圍，請輸入學生姓名：' : '右鍵新增課堂 - 學生姓名：');
-        
-        if (title) {
-            // 將姓名填入 AI 面板，並提示使用者
-            const inputPanel = document.getElementById('ai-text-input');
-            inputPanel.value = `學生：${title}\n(請確認左側選取範圍後點擊解析)`;
-            
-            // 如果面板是收起狀態，自動展開它
-            const content = document.getElementById('panel-content');
-            if(content.style.display === 'none') {
-                content.style.display = 'block';
-                document.getElementById('toggle-btn').innerText = '收起';
-            }
-            
-            alert("已填入姓名。若您剛才已拖曳選取範圍，現在點擊「解析」即可完成排課。");
-        }
-    });
-},
   
         // 簡約時間風格 (小時、15、30、45)
         slotLabelContent: (arg) => {
@@ -416,7 +390,7 @@ eventClick: function(info) {
 },
 
 select: function(info) {
-    // 只有在有複製內容時，左鍵點擊空白處才執行「貼上」
+    // 優先處理「貼上」邏輯
     if (copiedEventsBatch.length > 0) {
         copiedEventsBatch.forEach(d => {
             calendar.addEvent({
@@ -430,8 +404,35 @@ select: function(info) {
         });
         updateToCloud(); 
         copiedEventsBatch = []; 
+        calendar.unselect();
+        return;
     }
-    calendar.unselect();
+
+    // --- 這裡處理您要求的「直接新增」 ---
+    // 延遲一點點執行 prompt，確保「藍色範圍」在輸入時是看得到的
+    setTimeout(() => {
+        const studentName = prompt('請輸入學生姓名：');
+        if (studentName) {
+            const teacherName = prompt('請輸入老師姓名：', '以琳老師');
+            
+            if (teacherName) {
+                const newEvent = {
+                    title: studentName,
+                    start: info.startStr,
+                    end: info.endStr,
+                    resourceId: info.resource.id,
+                    extendedProps: { teacher: teacherName },
+                    backgroundColor: getTeacherColor(teacherName)
+                };
+                
+                calendar.addEvent(newEvent);
+                updateToCloud();
+                alert(`已新增：${studentName} (${teacherName})`);
+            }
+        }
+        // 操作結束後才取消選取範圍
+        calendar.unselect();
+    }, 100);
 },
 
   
