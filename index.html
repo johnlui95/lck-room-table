@@ -13,16 +13,16 @@
 /* 移除之前的 nth-child 相關代碼，改用以下方式 */
 
 /* 1. 設定基礎背景色 (星期二、四、六、一) 為白色 */
-.fc-day-mon, .fc-day-tue, .fc-day-thu, .fc-day-sat {
+.fc-day-sun, .fc-day-tue, .fc-day-thu, .fc-day-sat {
     background-color: #ffffff !important;
 }
 
 /* 2. 設定區間背景色 (星期日、三、五) 為淺藍/灰色 */
 /* 使用 .fc-timegrid-col 確保整欄(從上到下)都有顏色 */
-.fc-timegrid-col.fc-day-sun, 
+.fc-timegrid-col.fc-day-mon, 
 .fc-timegrid-col.fc-day-wed, 
 .fc-timegrid-col.fc-day-fri {
-    background-color: #f8fafc !important; /* 極淺的藍灰色 */
+    background-color: #f1f5f9 !important; /* 極淺的藍灰色 */
 }
 
 /* 3. 修正：今日高亮 (避免今日顏色被區間色覆蓋) */
