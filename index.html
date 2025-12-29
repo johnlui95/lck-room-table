@@ -266,15 +266,46 @@ window.handleAction = function(action) {
             }));
             alert(`已複製 ${finalT.length} 堂課`);
         } else if (action === 'delete') {
-            // ... 您原本的刪除邏輯 ...
-            let finalD = calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e)));
-            if (finalD.length === 0) finalD = [ev];
-            if (confirm(`確定要刪除這 ${finalD.length} 堂課嗎？`)) {
-                finalD.forEach(e => e.remove());
-                updateToCloud();
-                multiSelectIds.clear();
-            }
+        // 1. 取得畫面上所有的事件
+        const allEvents = calendar.getEvents();
+        
+        // 2. 篩選出 ID 存在於 multiSelectIds 中的事件物件
+        // 如果沒有多選，則只抓取當前點擊的那一個 (ev)
+        let finalD = allEvents.filter(e => multiSelectIds.has(getEvId(e)));
+        if (finalD.length === 0) finalD = [ev];
+        
+        if (confirm(`確定要刪除這 ${finalD.length} 堂課堂嗎？`)) {
+            // 💡 關鍵：先停止 Firebase 監聽，避免刪除過程中雲端數據跳回
+            eventRef.off('value'); 
+
+            // 3. 執行刪除
+            finalD.forEach(e => {
+                e.remove(); 
+            });
+
+            // 4. 清空選取紀錄
+            multiSelectIds.clear();
+
+            // 5. 立即同步到雲端
+            const remainingEvents = calendar.getEvents().map(e => ({
+                title: e.title, 
+                start: e.startStr, 
+                end: e.endStr,
+                resourceId: e.getResources()[0]?.id, 
+                extendedProps: e.extendedProps,
+                backgroundColor: e.backgroundColor
+            }));
+            
+            eventRef.set(remainingEvents).then(() => {
+                // 6. 同步成功後，重啟 Firebase 監聽
+                eventRef.on('value', snap => {
+                    calendar.removeAllEvents();
+                    if (snap.val()) calendar.addEventSource(Object.values(snap.val()));
+                });
+                alert("刪除成功並已同步雲端");
+            });
         }
+    }
     }
     menu.style.display = 'none';
     addBtn.style.display = 'none';
