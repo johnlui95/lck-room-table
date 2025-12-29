@@ -469,12 +469,15 @@ let active = false, xOffset = 0, yOffset = 0, initX, initY;
 header.onmousedown = (e) => { active = true; initX = e.clientX - xOffset; initY = e.clientY - yOffset; };
 document.onmousemove = (e) => { if(active) { xOffset = e.clientX - initX; yOffset = e.clientY - initY; panel.style.transform = `translate(${xOffset}px, ${yOffset}px)`; } };
 document.onmouseup = () => active = false;
+// ... (之前的面板拖拽與收合邏輯保持不變)
 document.getElementById('toggle-btn').onclick = function() {
     const c = document.getElementById('panel-content');
     c.style.display = (c.style.display === 'none' ? 'block' : 'none');
     this.innerText = (c.style.display === 'none' ? '展開' : '收起');
 };
-  });
-  </script>
+
+// 💡 關鍵修正：確保這裡正確閉合 DOMContentLoaded
+}); 
+</script>
 </body>
 </html>
