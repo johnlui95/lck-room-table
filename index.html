@@ -414,12 +414,25 @@ document.getElementById('parse-btn').onclick = function() {
 };
 
     // Firebase 實時同步
-    eventRef.on('value', snap => {
-        calendar.removeAllEvents();
-        if (snap.val()) calendar.addEventSource(Object.values(snap.val()));
-    });
-
-    calendar.render();
+// Firebase 實時同步修正版
+eventRef.on('value', snap => {
+    calendar.removeAllEvents();
+    const data = snap.val();
+    if (data) {
+        // 將對象轉為數組處理
+        const eventsArray = Object.values(data).map(e => {
+            const teacherName = e.extendedProps ? e.extendedProps.teacher : '以琳老師';
+            // 💡 關鍵：如果 e.backgroundColor 是預設紫色或不存在，就重新分配顏色
+            const correctColor = getTeacherColor(teacherName);
+            
+            return {
+                ...e,
+                backgroundColor: correctColor,
+                borderColor: correctColor // 讓邊框顏色也一致
+            };
+        });
+        calendar.addEventSource(eventsArray);
+    }
 });
 
     // 1. 定義預設色盤 (您可以隨意增加喜歡的顏色)
