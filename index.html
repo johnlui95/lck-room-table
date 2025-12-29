@@ -267,7 +267,6 @@ if (action === 'delete') {
     }
 
     // 統一渲染畫面並隱藏選單
-    calendar.render();
     document.getElementById('custom-menu').style.display = 'none';
 };
 
@@ -385,6 +384,33 @@ if (title) {
         eventRemove: updateToCloud
     });
 
+  calendar.render();
+
+    // Firebase 實時同步
+// Firebase 實時同步修正版
+eventRef.on('value', snap => {
+    calendar.removeAllEvents();
+    const data = snap.val();
+    if (data) {
+        const eventsArray = Object.values(data).map(e => {
+            // 抓取老師名，如果舊資料沒有這個欄位，預設為以琳老師
+            const teacherName = (e.extendedProps && e.extendedProps.teacher) 
+                                ? e.extendedProps.teacher 
+                                : '以琳老師';
+            
+            // 💡 關鍵：每次從雲端抓下來時，不看舊顏色，直接重新計算顏色
+            const correctColor = getTeacherColor(teacherName);
+            
+            return {
+                ...e,
+                backgroundColor: correctColor,
+                borderColor: correctColor
+            };
+        });
+        calendar.addEventSource(eventsArray);
+    }
+});
+  
     // AI 解析綁定
 document.getElementById('parse-btn').onclick = function() {
     const text = document.getElementById('ai-text-input').value;
@@ -437,30 +463,7 @@ document.getElementById('parse-btn').onclick = function() {
     }
 };
 
-    // Firebase 實時同步
-// Firebase 實時同步修正版
-eventRef.on('value', snap => {
-    calendar.removeAllEvents();
-    const data = snap.val();
-    if (data) {
-        const eventsArray = Object.values(data).map(e => {
-            // 抓取老師名，如果舊資料沒有這個欄位，預設為以琳老師
-            const teacherName = (e.extendedProps && e.extendedProps.teacher) 
-                                ? e.extendedProps.teacher 
-                                : '以琳老師';
-            
-            // 💡 關鍵：每次從雲端抓下來時，不看舊顏色，直接重新計算顏色
-            const correctColor = getTeacherColor(teacherName);
-            
-            return {
-                ...e,
-                backgroundColor: correctColor,
-                borderColor: correctColor
-            };
-        });
-        calendar.addEventSource(eventsArray);
-    }
-});
+
 
 
 // 面板拖拽與收合邏輯
