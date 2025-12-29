@@ -10,26 +10,29 @@
 
   [data-resource-id="R5"] { border-right: 3px solid #000 !important; }
 
-/* 讓星期一、三、五、日 顯示淺藍色背景 */
-/* 讓星期二、四、六 顯示白色背景 */
+/* 移除之前的 nth-child 相關代碼，改用以下方式 */
 
-/* 透過屬性選取器抓取特定日期的背景格 */
-.fc-day-mon, .fc-day-wed, .fc-day-fri, .fc-day-sun {
-    background-color: #f0f7ff !important; /* 極淺藍色，您可以改成 #fff9db 淺黃色 */
-}
-
-.fc-day-tue, .fc-day-thu, .fc-day-sat {
+/* 1. 設定基礎背景色 (星期二、四、六、一) 為白色 */
+.fc-day-mon, .fc-day-tue, .fc-day-thu, .fc-day-sat {
     background-color: #ffffff !important;
 }
 
-/* 強制覆蓋資源列的背景，確保它透明以顯示底下的日期顏色 */
-.fc-timegrid-col {
-    background-color: transparent !important;
+/* 2. 設定區間背景色 (星期日、三、五) 為淺藍/灰色 */
+/* 使用 .fc-timegrid-col 確保整欄(從上到下)都有顏色 */
+.fc-timegrid-col.fc-day-sun, 
+.fc-timegrid-col.fc-day-wed, 
+.fc-timegrid-col.fc-day-fri {
+    background-color: #f8fafc !important; /* 極淺的藍灰色 */
 }
 
-/* 今日的高亮顏色 */
-.fc-day-today {
-    background-color: rgba(255, 243, 191, 0.4) !important; /* 淡淡的琥珀金 */
+/* 3. 修正：今日高亮 (避免今日顏色被區間色覆蓋) */
+.fc-timegrid-col.fc-day-today {
+    background-color: rgba(254, 240, 138, 0.3) !important; 
+}
+
+/* 確保格線在背景色之上 */
+.fc-timegrid-slots td {
+    z-index: 2;
 }
   
   /* 允許日曆容器在內容過寬時出現橫向滾動條 */
