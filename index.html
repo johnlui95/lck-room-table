@@ -106,8 +106,10 @@
 /* 確保選取高亮範圍能感應右鍵，且顏色明顯 */
 .fc-highlight {
     background: rgba(99, 102, 241, 0.4) !important;
-    z-index: 4 !important; /* 確保在背景格之上 */
-    pointer-events: auto !important; /* 💡 關鍵：這讓右鍵能點到這個藍色層 */
+    z-index: 4 !important;
+    border: 2px dashed #6366f1 !important;
+    /* 💡 關鍵：必須設為 auto，右鍵選單才能偵測到它 */
+    pointer-events: auto !important; 
 }
 
 /* 避免選取的藍色框框擋住文字 */
@@ -216,27 +218,21 @@ function showCustomMenu(info) {
 
 // --- 2. 選單按鈕功能 ---
 window.handleAction = function(action) {
-    if (!selectedEventInfo) return;
-    const ev = selectedEventInfo;
-    const evId = getEvId(ev);
-  const menu = document.getElementById('custom-menu');
-    const addBtn = document.getElementById('menu-add-event');
-
-if (action === 'addNewEvent' && currentSelection) {
-        const studentName = prompt('請輸入學生姓名：');
-        if (studentName) {
-            const teacherName = prompt('請輸入老師姓名：', '以琳老師');
-            if (teacherName) {
+    if (action === 'addNewEvent' && currentSelection) {
+        const sName = prompt('請輸入學生姓名：');
+        if (sName) {
+            const tName = prompt('請輸入老師姓名：', '以琳老師');
+            if (tName) {
                 calendar.addEvent({
-                    title: studentName,
+                    title: sName,
                     start: currentSelection.startStr,
                     end: currentSelection.endStr,
                     resourceId: currentSelection.resource.id,
-                    extendedProps: { teacher: teacherName },
-                    backgroundColor: getTeacherColor(teacherName)
+                    extendedProps: { teacher: tName },
+                    backgroundColor: getTeacherColor(tName)
                 });
                 updateToCloud();
-                calendar.unselect(); // 新增完後清除藍色範圍
+                calendar.unselect(); // 清除藍色選取
                 currentSelection = null;
             }
         }
@@ -434,31 +430,30 @@ select: function(info) {
 },
 
 viewDidMount: function(arg) {
-    arg.el.addEventListener('contextmenu', function(ev) {
-        ev.preventDefault();
-        
-        const menu = document.getElementById('custom-menu');
-        const addBtn = document.getElementById('menu-add-event');
-        
-        // 檢查滑鼠右鍵點擊的地方是否有「藍色選取範圍」
-        const isOverSelection = ev.target.closest('.fc-highlight');
-        
-        if (isOverSelection && currentSelection) {
-            // 顯示選單並顯示「新增課堂」按鈕
-            addBtn.style.display = 'block';
-            menu.style.display = 'block';
-            menu.style.left = ev.clientX + 'px';
-            menu.style.top = ev.clientY + 'px';
+        arg.el.addEventListener('contextmenu', function(ev) {
+            ev.preventDefault();
+            const menu = document.getElementById('custom-menu');
+            const addBtn = document.getElementById('menu-add-event');
             
-            // 點擊選單外隱藏
-            const closeMenu = () => { 
-                menu.style.display = 'none'; 
-                document.removeEventListener('mousedown', closeMenu); 
-            };
-            setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
-        }
-    });
-},
+            // 檢查是否點在藍色範圍內
+            const isOverSelection = ev.target.closest('.fc-highlight');
+            
+            if (isOverSelection && currentSelection) {
+                addBtn.style.display = 'block'; // 顯示新增按鈕
+                menu.style.display = 'block';
+                menu.style.left = ev.clientX + 'px';
+                menu.style.top = ev.clientY + 'px';
+
+                const closeMenu = (e) => {
+                    if(!menu.contains(e.target)) {
+                        menu.style.display = 'none';
+                        document.removeEventListener('mousedown', closeMenu);
+                    }
+                };
+                setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
+            }
+        });
+    },
   
 
     // --- 這裡處理您要求的「直接新增」 ---
@@ -589,7 +584,7 @@ document.getElementById('toggle-btn').onclick = function() {
     const c = document.getElementById('panel-content');
     c.style.display = (c.style.display === 'none' ? 'block' : 'none');
     this.innerText = (c.style.display === 'none' ? '展開' : '收起');
-};
+  };
 
 // 💡 關鍵修正：確保這裡正確閉合 DOMContentLoaded
 }); 
