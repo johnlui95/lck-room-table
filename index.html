@@ -255,17 +255,23 @@ window.handleAction = function(action) {
                 updateToCloud();
             }
         } else if (action === 'copy') {
-            // ... 您原本的複製邏輯 ...
-            const targets = calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e)));
-            const finalT = targets.length > 0 ? targets : [ev];
-            finalT.sort((a, b) => a.start - b.start);
-            const ref = finalT[0].start;
-            copiedEventsBatch = finalT.map(e => ({
-                title: e.title, offset: e.start - ref, duration: e.end - e.start,
-                extendedProps: {...e.extendedProps}, backgroundColor: e.backgroundColor
-            }));
-            alert(`已複製 ${finalT.length} 堂課`);
-        } else if (action === 'delete') {
+        // 找到所有被勾選（有黃色框）的課堂
+        const targets = calendar.getEvents().filter(e => multiSelectIds.has(getEvId(e)));
+        // 如果沒有勾選任何課堂，就只複製當前點擊的那一個
+        const finalT = targets.length > 0 ? targets : [ev];
+        
+        finalT.sort((a, b) => a.start - b.start);
+        const ref = finalT[0].start;
+        copiedEventsBatch = finalT.map(e => ({
+            title: e.title, 
+            offset: e.start - ref, 
+            duration: e.end - e.start,
+            extendedProps: {...e.extendedProps}, 
+            backgroundColor: e.backgroundColor
+        }));
+        alert(`已複製 ${finalT.length} 堂課，點擊空白處可貼上。`);
+        multiSelectIds.clear();
+    } else if (action === 'delete') {
         // 1. 取得畫面上所有的事件
         const allEvents = calendar.getEvents();
         
