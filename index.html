@@ -168,14 +168,13 @@ const updateToCloud = () => {
 };
 
 function showCustomMenu(info) {
-    // 如果傳進來的 info 沒有 event (可能抓不到)，則不顯示
     if (!info.event) return; 
 
     selectedEventInfo = info.event;
     const menu = document.getElementById('custom-menu');
     menu.style.display = 'block';
     
-    // 使用 jsEvent 的 clientX/Y 定位
+    // 根據滑鼠右鍵位置定位
     menu.style.left = info.jsEvent.clientX + 'px';
     menu.style.top = info.jsEvent.clientY + 'px';
 
@@ -343,6 +342,22 @@ eventContent: (arg) => {
     };
 },
 
+eventDidMount: function(info) {
+        info.el.addEventListener('contextmenu', function(ev) {
+            ev.preventDefault(); // 阻止瀏覽器選單
+            ev.stopPropagation(); // 阻止事件冒泡到下方的空白格
+
+            const id = getEvId(info.event);
+            // 按照要求：只有選取了（有黃框）的課堂才彈出選單
+            if (multiSelectIds.has(id)) {
+                showCustomMenu({
+                    event: info.event,
+                    jsEvent: ev
+                });
+            }
+        });
+    },
+  
 eventClick: function(info) {
     info.jsEvent.preventDefault();
     const id = getEvId(info.event);
@@ -384,48 +399,22 @@ select: function(info) {
   calendar.render();
 
 // 監聽右鍵點擊事件
-document.getElementById('calendar').addEventListener('contextmenu', function(e) {
-    e.preventDefault(); // 阻止瀏覽器預設右鍵選單
+// 💡 優化：處理空白格右鍵新增
+document.querySelector('.fc-view-harness').addEventListener('contextmenu', function(e) {
+    // 如果點擊的是課堂，會被上面的 eventDidMount 攔截並 stopPropagation
+    // 走到這裡代表點擊的是空白處
+    e.preventDefault();
 
-    // 嘗試抓取點擊位置對應的日曆元素
-    const segEl = e.target.closest('.fc-event');
-    
-    if (segEl) {
-        // --- 情況 A: 右鍵點擊的是課堂 ---
-        // 透過元素找到 FullCalendar 的 event 物件
-        const eventEl = segEl;
-        // 這裡我們需要一個對應方式，最快的方法是觸發我們自訂的選單
-        // 先找到該 event 的 ID
-        const allEvents = calendar.getEvents();
-        const clickedEv = allEvents.find(ev => ev.el === eventEl || segEl.contains(ev.el));
+    const title = prompt('右鍵新增課堂 - 學生姓名：');
+    if (title) {
+        const t = prompt('導師：', '以琳老師');
+        const teacherName = t || '以琳老師';
         
-        // 模擬 info 物件傳給 showCustomMenu
-        if (clickedEv || segEl) {
-            // 由於直接抓物件較難，改用更保險的方法：
-            // 觸發 showCustomMenu，傳入滑鼠座標
-            const mockInfo = {
-                event: clickedEv,
-                jsEvent: e
-            };
-            
-            // 只有選取了的課堂才彈出選單 (按你要求：right click選取了的課堂)
-            // 如果你希望右鍵點擊未選取的課堂也能彈出，可以拿掉 multiSelectIds 的判斷
-            showCustomMenu(mockInfo);
-        }
-    } else {
-        // --- 情況 B: 右鍵點擊的是空白位置 ---
-        // 觸發新增課堂邏輯
-        const title = prompt('右鍵新增 - 學生姓名：');
-        if (title) {
-            const t = prompt('導師：', '以琳老師');
-            const teacherName = t || '以琳老師';
-            
-            // 這裡需要獲取點擊的時間點較複雜，建議改用彈窗輸入日期時間，
-            // 或者最直覺的方法：提示使用者先用左鍵選取範圍，再按右鍵新增。
-            alert("請先用滑鼠左鍵「拖曳選取」一段時間範圍，然後再按右鍵新增。");
-        }
+        // 提示使用者先選取時間
+        alert("新增提示：請先左鍵「拖曳選取」一段時間範圍，然後點擊解析助手，或直接於解析助手貼上訊息。");
     }
-}, false);
+});
+  
   
     // Firebase 實時同步
 // Firebase 實時同步修正版
