@@ -18,6 +18,8 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
+
+  .fc-timegrid-bg-harness,
   
 /* 強制開啟跨欄位選取感應 */
 .fc-timegrid-cols table {
@@ -97,6 +99,7 @@
 }
 .fc-slats td {
     pointer-events: all !important;
+    z-index: 1 !important;
 }
   
 </style>
@@ -310,26 +313,39 @@ calendar = new FullCalendar.Calendar(calendarEl, {
 
         selectable: true,
         unselectAuto: false,
+        longPressDelay: 50,
         editable: true,
         slotDuration: '00:15:00',
         slotLabelInterval: '00:15:00',
 
 viewDidMount: function(arg) {
-        arg.el.addEventListener('contextmenu', function(ev) {
-            // 如果點擊的是課堂，會被 eventDidMount 的 stopPropagation 擋住
-            // 走到這裡代表點擊的是日曆背景（空白格）
-            ev.preventDefault();
+    // 監聽日曆容器的右鍵事件
+    arg.el.addEventListener('contextmenu', function(ev) {
+        // 如果右鍵點擊的是現有課堂，我們在 eventDidMount 已處理過 stopPropagation
+        // 走到這裡表示點擊的是空白處
+        ev.preventDefault();
+
+        // 檢查是否有正在選取的範圍 (FullCalendar 的 highlight 元素是否存在)
+        const hasSelection = document.querySelector('.fc-highlight');
+        
+        const title = prompt(hasSelection ? '已選取範圍，請輸入學生姓名：' : '右鍵新增課堂 - 學生姓名：');
+        
+        if (title) {
+            // 將姓名填入 AI 面板，並提示使用者
+            const inputPanel = document.getElementById('ai-text-input');
+            inputPanel.value = `學生：${title}\n(請確認左側選取範圍後點擊解析)`;
             
-            // 檢查是否已經有選取的範圍
-            // 如果使用者先拖曳選取了，就彈出新增確認
-            const title = prompt('右鍵新增課堂 - 學生姓名：');
-            if (title) {
-                // 這裡可以連動 AI 解析面板
-                document.getElementById('ai-text-input').value = `學生：${title}\n日期：請確認選取範圍`;
-                alert("已將姓名填入助手，請確認左側選取範圍後點擊「解析」");
+            // 如果面板是收起狀態，自動展開它
+            const content = document.getElementById('panel-content');
+            if(content.style.display === 'none') {
+                content.style.display = 'block';
+                document.getElementById('toggle-btn').innerText = '收起';
             }
-        });
-    },
+            
+            alert("已填入姓名。若您剛才已拖曳選取範圍，現在點擊「解析」即可完成排課。");
+        }
+    });
+},
   
         // 簡約時間風格 (小時、15、30、45)
         slotLabelContent: (arg) => {
