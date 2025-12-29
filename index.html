@@ -388,25 +388,21 @@ if (action === 'paste' && info) {
     addBtn.style.display = 'none';
 };
 
+// 1. 香港假期儲存容器
 let hongKongHolidays = {};
 
-// 抓取香港公眾假期 (使用 Nager.Date API 作為範例)
+// 2. 抓取假期函式
 async function fetchHKHolidays(year) {
     try {
         const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/HK`);
         const data = await response.json();
-        data.forEach(h => {
-            hongKongHolidays[h.date] = h.localName; // 儲存格式如 {"2025-12-25": "聖誕節"}
-        });
-        if (calendar) calendar.render(); // 抓取完後重新渲染日曆
-    } catch (error) {
-        console.error("無法抓取假期數據:", error);
-    }
+        data.forEach(h => { hongKongHolidays[h.date] = h.localName; });
+        if (calendar) calendar.render(); 
+    } catch (e) { console.error("假期抓取失敗", e); }
 }
 
-// 初始抓取今年與明年的假期
-fetchHKHolidays(new Date().getFullYear());
-fetchHKHolidays(new Date().getFullYear() + 1);
+fetchHKHolidays(2025);
+fetchHKHolidays(2026);
 
     
 // --- 3. 初始化日曆 ---
@@ -424,26 +420,18 @@ calendar = new FullCalendar.Calendar(calendarEl, {
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
 
   dayCellDidMount: function(arg) {
-        const dateStr = arg.date.toISOString().split('T')[0]; // 取得 YYYY-MM-DD
+        const dateStr = arg.date.toLocaleDateString('en-CA'); // 格式化為 YYYY-MM-DD
         if (hongKongHolidays[dateStr]) {
-            // 如果這天是假期，加上 CSS 類別
             arg.el.classList.add('is-holiday');
-            
-            // 可選：在日期旁邊顯示假期名稱
-            const holidayName = hongKongHolidays[dateStr];
-            // 找到該格子的標題區域並加上文字 (針對 resourceTimeGrid 視圖)
         }
     },
-
-    // 針對 TimeGrid 視圖的列進行染色
     dayHeaderDidMount: function(arg) {
-        const dateStr = arg.date.toISOString().split('T')[0];
+        const dateStr = arg.date.toLocaleDateString('en-CA');
         if (hongKongHolidays[dateStr]) {
             arg.el.classList.add('is-holiday');
         }
     }
-});
-  
+
         // --- 關鍵修改：隱藏 all-day 欄位 ---
         allDaySlot: false,
 
