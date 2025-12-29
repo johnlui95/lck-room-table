@@ -113,7 +113,31 @@
   <div id='calendar'></div>
   
   <script>
-// --- 1. 核心變數與 Firebase 配置 ---
+
+        // 1. 定義預設色盤 (您可以隨意增加喜歡的顏色)
+const colorPalette = [
+    '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', 
+    '#06b6d4', '#f43f5e', '#14b8a6', '#f97316', '#3b82f6',
+    '#22c55e', '#ef4444', '#eab308', '#a855f7', '#0ea5e9'
+];
+
+let teacherColorMap = {};
+let colorIndex = 0;
+
+function getTeacherColor(name) {
+    if (!name) return '#94a3b8';
+    // 清除空格確保名字匹配
+    const cleanName = name.trim();
+    if (!teacherColorMap[cleanName]) {
+        teacherColorMap[cleanName] = colorPalette[colorIndex % colorPalette.length];
+        colorIndex++;
+    }
+    return teacherColorMap[cleanName];
+}
+    
+    
+    
+    // --- 1. 核心變數與 Firebase 配置 ---
 const firebaseConfig = {
     apiKey: "AIzaSyAFPtHLY-LqLnDiKUot0mpAPchrC7iqAXg",
     authDomain: "lckroomtable.firebaseapp.com",
@@ -415,46 +439,34 @@ document.getElementById('parse-btn').onclick = function() {
 
     // Firebase 實時同步
 // Firebase 實時同步修正版
+// --- 關鍵修改：修正 Firebase 監聽邏輯 ---
 eventRef.on('value', snap => {
     calendar.removeAllEvents();
     const data = snap.val();
     if (data) {
-        // 將對象轉為數組處理
+        // 將物件轉為陣列，並在載入前處理顏色
         const eventsArray = Object.values(data).map(e => {
-            const teacherName = e.extendedProps ? e.extendedProps.teacher : '以琳老師';
-            // 💡 關鍵：如果 e.backgroundColor 是預設紫色或不存在，就重新分配顏色
+            // 取得老師名字，若無則設為預設值
+            const teacherName = (e.extendedProps && e.extendedProps.teacher) 
+                                ? e.extendedProps.teacher 
+                                : '以琳老師';
+            
+            // 💡 強制調用 getTeacherColor 重新計算顏色
             const correctColor = getTeacherColor(teacherName);
             
             return {
                 ...e,
-                backgroundColor: correctColor,
-                borderColor: correctColor // 讓邊框顏色也一致
+                backgroundColor: correctColor, // 覆蓋掉舊的單一顏色
+                borderColor: correctColor     // 使邊框顏色同步
             };
         });
+        
+        // 將處理完畢的課程陣列放入日曆
         calendar.addEventSource(eventsArray);
     }
 });
 
-    // 1. 定義預設色盤 (您可以隨意增加喜歡的顏色)
-const colorPalette = [
-    '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', 
-    '#06b6d4', '#f43f5e', '#14b8a6', '#f97316', '#3b82f6',
-    '#22c55e', '#ef4444', '#eab308', '#a855f7', '#0ea5e9'
-];
 
-let teacherColorMap = {};
-let colorIndex = 0;
-
-function getTeacherColor(name) {
-    if (!name) return '#94a3b8';
-    // 清除空格確保名字匹配
-    const cleanName = name.trim();
-    if (!teacherColorMap[cleanName]) {
-        teacherColorMap[cleanName] = colorPalette[colorIndex % colorPalette.length];
-        colorIndex++;
-    }
-    return teacherColorMap[cleanName];
-}
 
 // 面板拖拽與收合邏輯
 const panel = document.getElementById('smart-input-panel'), header = document.getElementById('panel-header');
