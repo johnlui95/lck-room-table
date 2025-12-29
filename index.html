@@ -439,33 +439,28 @@ document.getElementById('parse-btn').onclick = function() {
 
     // Firebase 實時同步
 // Firebase 實時同步修正版
-// --- 關鍵修改：修正 Firebase 監聽邏輯 ---
 eventRef.on('value', snap => {
     calendar.removeAllEvents();
     const data = snap.val();
     if (data) {
-        // 將物件轉為陣列，並在載入前處理顏色
         const eventsArray = Object.values(data).map(e => {
-            // 取得老師名字，若無則設為預設值
+            // 抓取老師名，如果舊資料沒有這個欄位，預設為以琳老師
             const teacherName = (e.extendedProps && e.extendedProps.teacher) 
                                 ? e.extendedProps.teacher 
                                 : '以琳老師';
             
-            // 💡 強制調用 getTeacherColor 重新計算顏色
+            // 💡 關鍵：每次從雲端抓下來時，不看舊顏色，直接重新計算顏色
             const correctColor = getTeacherColor(teacherName);
             
             return {
                 ...e,
-                backgroundColor: correctColor, // 覆蓋掉舊的單一顏色
-                borderColor: correctColor     // 使邊框顏色同步
+                backgroundColor: correctColor,
+                borderColor: correctColor
             };
         });
-        
-        // 將處理完畢的課程陣列放入日曆
         calendar.addEventSource(eventsArray);
     }
 });
-
 
 
 // 面板拖拽與收合邏輯
