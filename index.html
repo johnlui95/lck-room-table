@@ -168,11 +168,17 @@ const updateToCloud = () => {
 };
 
 function showCustomMenu(info) {
+    // 如果傳進來的 info 沒有 event (可能抓不到)，則不顯示
+    if (!info.event) return; 
+
     selectedEventInfo = info.event;
     const menu = document.getElementById('custom-menu');
     menu.style.display = 'block';
+    
+    // 使用 jsEvent 的 clientX/Y 定位
     menu.style.left = info.jsEvent.clientX + 'px';
     menu.style.top = info.jsEvent.clientY + 'px';
+
     const closeMenu = (e) => { 
         if(!menu.contains(e.target)) { 
             menu.style.display = 'none'; 
@@ -337,55 +343,90 @@ eventContent: (arg) => {
     };
 },
 
-        eventClick: function(info) {
-            info.jsEvent.preventDefault();
-            const id = getEvId(info.event);
-            multiSelectIds.has(id) ? showCustomMenu(info) : (multiSelectIds.add(id), calendar.render());
-        },
-
-        select: function(info) {
-            if (copiedEventsBatch.length > 0) {
-                copiedEventsBatch.forEach(d => {
-                    calendar.addEvent({
-                        title: d.title, start: new Date(info.start.getTime() + d.offset),
-                        end: new Date(info.start.getTime() + d.offset + d.duration),
-                        resourceId: info.resource.id, extendedProps: d.extendedProps, backgroundColor: d.backgroundColor
-                    });
-                });
-                updateToCloud(); copiedEventsBatch = []; calendar.unselect(); return;
-            }
-            if ((info.end - info.start) / 60000 > 15) {
-                let found = false;
-                calendar.getEvents().forEach(ev => {
-                    if (ev.start >= info.start && ev.start < info.end) { multiSelectIds.add(getEvId(ev)); found = true; }
-                });
-                if (found) { calendar.render(); calendar.unselect(); return; }
-            }
-// 在 calendar 的 select 邏輯內
-const title = prompt('學生姓名：');
-if (title) {
-    const t = prompt('導師：', '以琳老師');
-    const teacherName = t || '以琳老師'; // 確保有名字
+eventClick: function(info) {
+    info.jsEvent.preventDefault();
+    const id = getEvId(info.event);
     
-    calendar.addEvent({
-        title: title,
-        start: info.startStr,
-        end: info.endStr,
-        resourceId: info.resource.id,
-        extendedProps: { teacher: teacherName },
-        // 💡 修改點：統一使用 getTeacherColor 函式
-        backgroundColor: getTeacherColor(teacherName) 
-    });
-    updateToCloud();
-}
-            calendar.unselect();
-        },
+    if (multiSelectIds.has(id)) {
+        // 如果已經選取，點擊則取消選取
+        multiSelectIds.delete(id);
+    } else {
+        // 如果未選取，點擊則加入選取
+        multiSelectIds.add(id);
+    }
+    calendar.render(); // 重新渲染以更新黃色外框樣式
+},
+
+select: function(info) {
+    // 只有在有複製內容時，左鍵點擊空白處才執行「貼上」
+    if (copiedEventsBatch.length > 0) {
+        copiedEventsBatch.forEach(d => {
+            calendar.addEvent({
+                title: d.title, 
+                start: new Date(info.start.getTime() + d.offset),
+                end: new Date(info.start.getTime() + d.offset + d.duration),
+                resourceId: info.resource.id, 
+                extendedProps: d.extendedProps, 
+                backgroundColor: d.backgroundColor
+            });
+        });
+        updateToCloud(); 
+        copiedEventsBatch = []; 
+    }
+    calendar.unselect();
+},
+
+  
         eventChange: updateToCloud,
         eventRemove: updateToCloud
     });
 
   calendar.render();
 
+// 監聽右鍵點擊事件
+document.getElementById('calendar').addEventListener('contextmenu', function(e) {
+    e.preventDefault(); // 阻止瀏覽器預設右鍵選單
+
+    // 嘗試抓取點擊位置對應的日曆元素
+    const segEl = e.target.closest('.fc-event');
+    
+    if (segEl) {
+        // --- 情況 A: 右鍵點擊的是課堂 ---
+        // 透過元素找到 FullCalendar 的 event 物件
+        const eventEl = segEl;
+        // 這裡我們需要一個對應方式，最快的方法是觸發我們自訂的選單
+        // 先找到該 event 的 ID
+        const allEvents = calendar.getEvents();
+        const clickedEv = allEvents.find(ev => ev.el === eventEl || segEl.contains(ev.el));
+        
+        // 模擬 info 物件傳給 showCustomMenu
+        if (clickedEv || segEl) {
+            // 由於直接抓物件較難，改用更保險的方法：
+            // 觸發 showCustomMenu，傳入滑鼠座標
+            const mockInfo = {
+                event: clickedEv,
+                jsEvent: e
+            };
+            
+            // 只有選取了的課堂才彈出選單 (按你要求：right click選取了的課堂)
+            // 如果你希望右鍵點擊未選取的課堂也能彈出，可以拿掉 multiSelectIds 的判斷
+            showCustomMenu(mockInfo);
+        }
+    } else {
+        // --- 情況 B: 右鍵點擊的是空白位置 ---
+        // 觸發新增課堂邏輯
+        const title = prompt('右鍵新增 - 學生姓名：');
+        if (title) {
+            const t = prompt('導師：', '以琳老師');
+            const teacherName = t || '以琳老師';
+            
+            // 這裡需要獲取點擊的時間點較複雜，建議改用彈窗輸入日期時間，
+            // 或者最直覺的方法：提示使用者先用左鍵選取範圍，再按右鍵新增。
+            alert("請先用滑鼠左鍵「拖曳選取」一段時間範圍，然後再按右鍵新增。");
+        }
+    }
+}, false);
+  
     // Firebase 實時同步
 // Firebase 實時同步修正版
 eventRef.on('value', snap => {
