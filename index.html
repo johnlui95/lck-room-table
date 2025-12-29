@@ -10,25 +10,6 @@
 
   [data-resource-id="R5"] { border-right: 3px solid #000 !important; }
 
-/* 公眾假期整欄背景色 */
-.is-holiday {
-    background-color: #fff1f0 !important; /* 極淺紅色背景 */
-}
-
-/* 讓假日的日期文字變成紅色 */
-.is-holiday .fc-col-header-cell-cushion {
-    color: #ff4d4f !important;
-    font-weight: bold;
-}
-
-/* 讓節日名稱顯示的小標籤（可選） */
-.holiday-label {
-    font-size: 10px;
-    color: #ff4d4f;
-    display: block;
-    margin-top: 2px;
-}
-  
 /* 移除之前的 nth-child 相關代碼，改用以下方式 */
 
 /* 1. 設定基礎背景色 (星期二、四、六、一) 為白色 */
@@ -388,23 +369,6 @@ if (action === 'paste' && info) {
     addBtn.style.display = 'none';
 };
 
-// 1. 香港假期儲存容器
-let hongKongHolidays = {};
-
-// 2. 抓取假期函式
-async function fetchHKHolidays(year) {
-    try {
-        const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/HK`);
-        const data = await response.json();
-        data.forEach(h => { hongKongHolidays[h.date] = h.localName; });
-        if (calendar) calendar.render(); 
-    } catch (e) { console.error("假期抓取失敗", e); }
-}
-
-fetchHKHolidays(2025);
-fetchHKHolidays(2026);
-
-    
 // --- 3. 初始化日曆 ---
 document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('calendar');
@@ -418,20 +382,7 @@ calendar = new FullCalendar.Calendar(calendarEl, {
         },
         locale: 'zh-tw',
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
-
-  dayCellDidMount: function(arg) {
-        const dateStr = arg.date.toLocaleDateString('en-CA'); // 格式化為 YYYY-MM-DD
-        if (hongKongHolidays[dateStr]) {
-            arg.el.classList.add('is-holiday');
-        }
-    },
-    dayHeaderDidMount: function(arg) {
-        const dateStr = arg.date.toLocaleDateString('en-CA');
-        if (hongKongHolidays[dateStr]) {
-            arg.el.classList.add('is-holiday');
-        }
-    }
-
+        
         // --- 關鍵修改：隱藏 all-day 欄位 ---
         allDaySlot: false,
 
@@ -450,7 +401,6 @@ calendar = new FullCalendar.Calendar(calendarEl, {
         slotLabelInterval: '00:15:00',
 
 
-  
   
         // 簡約時間風格 (小時、15、30、45)
         slotLabelContent: (arg) => {
