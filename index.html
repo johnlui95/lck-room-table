@@ -218,22 +218,25 @@ function showCustomMenu(info) {
 
 // --- 2. 選單按鈕功能 ---
 window.handleAction = function(action) {
-    if (action === 'addNewEvent' && currentSelection) {
-        const sName = prompt('請輸入學生姓名：');
-        if (sName) {
-            const tName = prompt('請輸入老師姓名：', '以琳老師');
-            if (tName) {
+    const menu = document.getElementById('custom-menu');
+    const info = window.currentSelection;
+
+    if (action === 'addNewEvent' && info) {
+        const studentName = prompt('請輸入學生姓名：');
+        if (studentName) {
+            const teacherName = prompt('請輸入老師姓名：', '以琳老師');
+            if (teacherName) {
                 calendar.addEvent({
-                    title: sName,
-                    start: currentSelection.startStr,
-                    end: currentSelection.endStr,
-                    resourceId: currentSelection.resource.id,
-                    extendedProps: { teacher: tName },
-                    backgroundColor: getTeacherColor(tName)
+                    title: studentName,
+                    start: info.startStr,
+                    end: info.endStr,
+                    resourceId: info.resource.id,
+                    extendedProps: { teacher: teacherName },
+                    backgroundColor: getTeacherColor(teacherName)
                 });
                 updateToCloud();
-                calendar.unselect(); // 清除藍色選取
-                currentSelection = null;
+                calendar.unselect();
+                window.currentSelection = null;
             }
         }
     }
@@ -322,7 +325,7 @@ if (action === 'delete') {
 addBtn.style.display = 'none';
     menu.style.display = 'none';
   
-  
+}
 };
 
 // --- 3. 初始化日曆 ---
@@ -426,71 +429,50 @@ eventClick: function(info) {
     calendar.render(); // 重新渲染以更新黃色外框樣式
 },
 
-select: function(info) {
-    // 記錄目前的選取範圍
-    currentSelection = info;
-},
+// 修正後的 select：只紀錄資訊，不彈出視窗
+        select: function(info) {
+            window.currentSelection = info; 
+        },
+  
+selectable: true,
+        unselectAuto: false, // 💡 讓藍色範圍留著，不要自動消失
 
-viewDidMount: function(arg) {
-        arg.el.addEventListener('contextmenu', function(ev) {
-            ev.preventDefault();
-            const menu = document.getElementById('custom-menu');
-            const addBtn = document.getElementById('menu-add-event');
-            
-            // 檢查是否點在藍色範圍內
-            const isOverSelection = ev.target.closest('.fc-highlight');
-            
-            if (isOverSelection && currentSelection) {
-                addBtn.style.display = 'block'; // 顯示新增按鈕
-                menu.style.display = 'block';
-                menu.style.left = ev.clientX + 'px';
-                menu.style.top = ev.clientY + 'px';
+        // 修正後的 select：只紀錄資訊，不彈出視窗
+        select: function(info) {
+            window.currentSelection = info; 
+        },
 
-                const closeMenu = (e) => {
-                    if(!menu.contains(e.target)) {
+        // 💡 這裡是關鍵：新增右鍵選單監聽器
+        viewDidMount: function(arg) {
+            arg.el.addEventListener('contextmenu', function(ev) {
+                ev.preventDefault();
+                const menu = document.getElementById('custom-menu');
+                const addBtn = document.getElementById('menu-add-event');
+                
+                // 檢查是否點在藍色高亮範圍 (.fc-highlight)
+                const isOverSelection = ev.target.closest('.fc-highlight');
+                
+                if (isOverSelection && window.currentSelection) {
+                    addBtn.style.display = 'block'; 
+                    menu.style.display = 'block';
+                    menu.style.left = ev.clientX + 'px';
+                    menu.style.top = ev.clientY + 'px';
+
+                    // 點擊其他地方關閉選單
+                    const closeMenu = () => {
                         menu.style.display = 'none';
                         document.removeEventListener('mousedown', closeMenu);
-                    }
-                };
-                setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
-            }
-        });
-    },
-  
+                    };
+                    setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
+                }
+            });
+        },
 
-    // --- 這裡處理您要求的「直接新增」 ---
-    // 延遲一點點執行 prompt，確保「藍色範圍」在輸入時是看得到的
-    setTimeout(() => {
-        const studentName = prompt('請輸入學生姓名：');
-        if (studentName) {
-            const teacherName = prompt('請輸入老師姓名：', '以琳老師');
-            
-            if (teacherName) {
-                const newEvent = {
-                    title: studentName,
-                    start: info.startStr,
-                    end: info.endStr,
-                    resourceId: info.resource.id,
-                    extendedProps: { teacher: teacherName },
-                    backgroundColor: getTeacherColor(teacherName)
-                };
-                
-                calendar.addEvent(newEvent);
-                updateToCloud();
-                alert(`已新增：${studentName} (${teacherName})`);
-            }
-        }
-        // 操作結束後才取消選取範圍
-        calendar.unselect();
-    }, 100);
-},
-
-  
         eventChange: updateToCloud,
         eventRemove: updateToCloud
-    });
+    }); // 💡 這是日曆配置物件的結尾括號
 
-  calendar.render();
+    calendar.render();
 
 
   
