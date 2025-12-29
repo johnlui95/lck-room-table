@@ -123,7 +123,7 @@
 
 <div id="custom-menu" style="display:none; position:fixed; z-index:9999; background:white; border:1px solid #ccc; box-shadow: 2px 2px 10px rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden;">
     <div id="menu-add-event" style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #eee; color: #10b981; font-weight: bold; display: none;" onclick="handleAction('addNewEvent')">➕ 新增課堂</div>
-    
+    <div id="menu-paste-event" style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #eee; color: #3b82f6; font-weight: bold; display: none;" onclick="handleAction('paste')">📋 貼上課堂</div>
     <div style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #eee; font-weight: bold; background: #f9fafb;" onclick="handleAction('toggleSelect')">🔲 取消選取此課堂</div>
     <div style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #eee;" onclick="handleAction('editName')">✏️ 修改學生名</div>
     <div style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #eee;" onclick="handleAction('editTeacher')">👩‍🏫 修改老師名</div>
@@ -223,6 +223,33 @@ window.handleAction = function(action) {
     const info = window.currentSelection; // 拖曳選取的範圍
     const ev = selectedEvent;            // 點擊現有課堂的物件
 
+// 在 handleAction 函式內的 if (action === 'addNewEvent' ...) 區塊後面加入：
+if (action === 'paste' && info) {
+    if (copiedEventsBatch.length === 0) {
+        alert("剪貼簿中沒有課堂資訊。");
+        return;
+    }
+
+    copiedEventsBatch.forEach(evData => {
+        // 根據點擊的位置 (info.start) 加上 偏移量 (offset) 計算新時間
+        const newStart = new Date(info.start.getTime() + evData.offset);
+        const newEnd = new Date(newStart.getTime() + evData.duration);
+
+        calendar.addEvent({
+            title: evData.title,
+            start: newStart,
+            end: newEnd,
+            resourceId: info.resource.id, // 貼到目前選中的房間
+            extendedProps: evData.extendedProps,
+            backgroundColor: evData.backgroundColor
+        });
+    });
+
+    updateToCloud();
+    alert(`已貼上 ${copiedEventsBatch.length} 堂課堂。`);
+    calendar.unselect();
+}
+  
     if (action === 'addNewEvent' && info) {
         const studentName = prompt('請輸入學生姓名：');
         if (studentName) {
@@ -437,30 +464,35 @@ selectable: true,
 
         // 💡 這裡是關鍵：新增右鍵選單監聽器
 viewDidMount: function(arg) {
-            arg.el.addEventListener('contextmenu', function(ev) {
-                ev.preventDefault();
-                const menu = document.getElementById('custom-menu');
-                const addBtn = document.getElementById('menu-add-event');
-                
-                // 判斷是否點在藍色選取區
-                const isOverSelection = ev.target.closest('.fc-highlight');
-                
-                if (isOverSelection && window.currentSelection) {
-                    addBtn.style.display = 'block'; // 顯示「新增課堂」按鈕
-                    menu.style.display = 'block';
-                    menu.style.left = ev.clientX + 'px';
-                    menu.style.top = ev.clientY + 'px';
+    arg.el.addEventListener('contextmenu', function(ev) {
+        ev.preventDefault();
+        const menu = document.getElementById('custom-menu');
+        const addBtn = document.getElementById('menu-add-event');
+        const pasteBtn = document.getElementById('menu-paste-event'); // 新增這行
+        
+        const isOverSelection = ev.target.closest('.fc-highlight');
+        
+        if (isOverSelection && window.currentSelection) {
+            // 如果有選取範圍，顯示「新增」
+            addBtn.style.display = 'block';
+            
+            // 如果剪貼簿有東西，顯示「貼上」
+            pasteBtn.style.display = copiedEventsBatch.length > 0 ? 'block' : 'none';
+            
+            menu.style.display = 'block';
+            menu.style.left = ev.clientX + 'px';
+            menu.style.top = ev.clientY + 'px';
 
-                    const closeMenu = (e) => {
-                        if(!menu.contains(e.target)) {
-                            menu.style.display = 'none';
-                            document.removeEventListener('mousedown', closeMenu);
-                        }
-                    };
-                    setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
+            const closeMenu = (e) => {
+                if(!menu.contains(e.target)) {
+                    menu.style.display = 'none';
+                    document.removeEventListener('mousedown', closeMenu);
                 }
-            });
-        },
+            };
+            setTimeout(() => document.addEventListener('mousedown', closeMenu), 50);
+        }
+    });
+},
 
         eventChange: updateToCloud,
         eventRemove: updateToCloud
