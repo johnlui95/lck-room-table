@@ -9,6 +9,26 @@
   body { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; background-color: #f8fafc; overflow: hidden; }
 
   [data-resource-id="R5"] { border-right: 3px solid #000 !important; }
+
+/* 為奇數欄位（日期）設定微弱的背景色 */
+.fc-day-today {
+    background-color: rgba(254, 240, 138, 0.3) !important; /* 今日高亮，淡淡的黃色 */
+}
+
+/* 針對 resourceTimeGrid 視圖中的每一天進行隔行變色 */
+/* 這裡的 2n 代表隔一列變色，您可以根據需求調整顏色 */
+.fc-timegrid-col:nth-child(even) {
+    background-color: #f1f5f9; /* 偶數日期欄位使用極淺灰色 */
+}
+
+.fc-timegrid-col:nth-child(odd) {
+    background-color: #ffffff; /* 奇數日期欄位保持純白 */
+}
+
+/* 讓格線顏色稍微明顯一點，配合區間色 */
+.fc-timegrid-slots td {
+    border-color: #e2e8f0 !important;
+}
   
   /* 允許日曆容器在內容過寬時出現橫向滾動條 */
 .fc {
