@@ -338,16 +338,23 @@ eventContent: (arg) => {
                 });
                 if (found) { calendar.render(); calendar.unselect(); return; }
             }
-            const title = prompt('學生姓名：');
-            if (title) {
-                const t = prompt('導師：', '以琳老師');
-                calendar.addEvent({
-                    title: title, start: info.startStr, end: info.endStr, resourceId: info.resource.id,
-                    extendedProps: { teacher: t || '以琳老師' },
-                    backgroundColor: (t && t.includes('JK')) ? '#10b981' : '#6366f1'
-                });
-                updateToCloud();
-            }
+// 在 calendar 的 select 邏輯內
+const title = prompt('學生姓名：');
+if (title) {
+    const t = prompt('導師：', '以琳老師');
+    const teacherName = t || '以琳老師'; // 確保有名字
+    
+    calendar.addEvent({
+        title: title,
+        start: info.startStr,
+        end: info.endStr,
+        resourceId: info.resource.id,
+        extendedProps: { teacher: teacherName },
+        // 💡 修改點：統一使用 getTeacherColor 函式
+        backgroundColor: getTeacherColor(teacherName) 
+    });
+    updateToCloud();
+}
             calendar.unselect();
         },
         eventChange: updateToCloud,
@@ -418,7 +425,8 @@ document.getElementById('parse-btn').onclick = function() {
     // 1. 定義預設色盤 (您可以隨意增加喜歡的顏色)
 const colorPalette = [
     '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', 
-    '#06b6d4', '#f43f5e', '#14b8a6', '#f97316', '#3b82f6'
+    '#06b6d4', '#f43f5e', '#14b8a6', '#f97316', '#3b82f6',
+    '#4ade80', '#fb7185', '#2dd4bf', '#fbbf24', '#a78bfa' // 新增更多顏色
 ];
 
 // 2. 用來儲存「老師 -> 顏色」對應關係的物件
