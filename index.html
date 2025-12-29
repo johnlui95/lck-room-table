@@ -10,6 +10,25 @@
 
   [data-resource-id="R5"] { border-right: 3px solid #000 !important; }
 
+/* 公眾假期整欄背景色 */
+.is-holiday {
+    background-color: #fff1f0 !important; /* 極淺紅色背景 */
+}
+
+/* 讓假日的日期文字變成紅色 */
+.is-holiday .fc-col-header-cell-cushion {
+    color: #ff4d4f !important;
+    font-weight: bold;
+}
+
+/* 讓節日名稱顯示的小標籤（可選） */
+.holiday-label {
+    font-size: 10px;
+    color: #ff4d4f;
+    display: block;
+    margin-top: 2px;
+}
+  
 /* 移除之前的 nth-child 相關代碼，改用以下方式 */
 
 /* 1. 設定基礎背景色 (星期二、四、六、一) 為白色 */
@@ -369,6 +388,27 @@ if (action === 'paste' && info) {
     addBtn.style.display = 'none';
 };
 
+let hongKongHolidays = {};
+
+// 抓取香港公眾假期 (使用 Nager.Date API 作為範例)
+async function fetchHKHolidays(year) {
+    try {
+        const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/HK`);
+        const data = await response.json();
+        data.forEach(h => {
+            hongKongHolidays[h.date] = h.localName; // 儲存格式如 {"2025-12-25": "聖誕節"}
+        });
+        if (calendar) calendar.render(); // 抓取完後重新渲染日曆
+    } catch (error) {
+        console.error("無法抓取假期數據:", error);
+    }
+}
+
+// 初始抓取今年與明年的假期
+fetchHKHolidays(new Date().getFullYear());
+fetchHKHolidays(new Date().getFullYear() + 1);
+
+    
 // --- 3. 初始化日曆 ---
 document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('calendar');
@@ -382,7 +422,28 @@ calendar = new FullCalendar.Calendar(calendarEl, {
         },
         locale: 'zh-tw',
         schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
-        
+
+  dayCellDidMount: function(arg) {
+        const dateStr = arg.date.toISOString().split('T')[0]; // 取得 YYYY-MM-DD
+        if (hongKongHolidays[dateStr]) {
+            // 如果這天是假期，加上 CSS 類別
+            arg.el.classList.add('is-holiday');
+            
+            // 可選：在日期旁邊顯示假期名稱
+            const holidayName = hongKongHolidays[dateStr];
+            // 找到該格子的標題區域並加上文字 (針對 resourceTimeGrid 視圖)
+        }
+    },
+
+    // 針對 TimeGrid 視圖的列進行染色
+    dayHeaderDidMount: function(arg) {
+        const dateStr = arg.date.toISOString().split('T')[0];
+        if (hongKongHolidays[dateStr]) {
+            arg.el.classList.add('is-holiday');
+        }
+    }
+
+  
         // --- 關鍵修改：隱藏 all-day 欄位 ---
         allDaySlot: false,
 
@@ -401,6 +462,7 @@ calendar = new FullCalendar.Calendar(calendarEl, {
         slotLabelInterval: '00:15:00',
 
 
+  
   
         // 簡約時間風格 (小時、15、30、45)
         slotLabelContent: (arg) => {
