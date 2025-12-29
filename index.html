@@ -90,6 +90,15 @@
   .event-teacher { font-size: 11px; margin-top: 2px; }
 
   @media (max-width: 768px) { #smart-input-panel { width: 90%; right: 5%; top: 10px; } }
+
+/* 確保空白格子可以被點擊和拖曳 */
+.fc-timegrid-bg-harness {
+    pointer-events: all !important;
+}
+.fc-slats td {
+    pointer-events: all !important;
+}
+  
 </style>
 </head>
 <body>
@@ -300,10 +309,28 @@ calendar = new FullCalendar.Calendar(calendarEl, {
         slotMaxTime: '22:00:00',
 
         selectable: true,
+        unselectAuto: false,
         editable: true,
         slotDuration: '00:15:00',
         slotLabelInterval: '00:15:00',
-        
+
+viewDidMount: function(arg) {
+        arg.el.addEventListener('contextmenu', function(ev) {
+            // 如果點擊的是課堂，會被 eventDidMount 的 stopPropagation 擋住
+            // 走到這裡代表點擊的是日曆背景（空白格）
+            ev.preventDefault();
+            
+            // 檢查是否已經有選取的範圍
+            // 如果使用者先拖曳選取了，就彈出新增確認
+            const title = prompt('右鍵新增課堂 - 學生姓名：');
+            if (title) {
+                // 這裡可以連動 AI 解析面板
+                document.getElementById('ai-text-input').value = `學生：${title}\n日期：請確認選取範圍`;
+                alert("已將姓名填入助手，請確認左側選取範圍後點擊「解析」");
+            }
+        });
+    },
+  
         // 簡約時間風格 (小時、15、30、45)
         slotLabelContent: (arg) => {
             const hour = arg.date.getHours();
