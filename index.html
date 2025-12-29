@@ -425,22 +425,7 @@ select: function(info) {
 
   calendar.render();
 
-// 監聽右鍵點擊事件
-// 💡 優化：處理空白格右鍵新增
-document.querySelector('.fc-view-harness').addEventListener('contextmenu', function(e) {
-    // 如果點擊的是課堂，會被上面的 eventDidMount 攔截並 stopPropagation
-    // 走到這裡代表點擊的是空白處
-    e.preventDefault();
 
-    const title = prompt('右鍵新增課堂 - 學生姓名：');
-    if (title) {
-        const t = prompt('導師：', '以琳老師');
-        const teacherName = t || '以琳老師';
-        
-        // 提示使用者先選取時間
-        alert("新增提示：請先左鍵「拖曳選取」一段時間範圍，然後點擊解析助手，或直接於解析助手貼上訊息。");
-    }
-});
   
   
     // Firebase 實時同步
