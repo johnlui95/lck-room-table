@@ -558,7 +558,7 @@ eventRef.on('value', snap => {
     // AI 解析綁定
 document.getElementById('parse-btn').onclick = function() {
     const text = document.getElementById('ai-text-input').value;
-    const nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費)/);
+    const nameMatch = text.match(/([^\s\n\d,，.]{2,4})(?=[已巳]繳|同學|先生|小姐|學費|新一期)/);
     const dateMatch = text.match(/(\d{1,2})月(\d{1,2})日/g);
     const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
 
