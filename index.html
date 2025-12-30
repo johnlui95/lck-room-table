@@ -563,8 +563,10 @@ document.getElementById('parse-btn').onclick = function() {
     const timeMatch = text.match(/(\d{1,2}[:：]\d{2})[-–—](\d{1,2}[:：]\d{2})/);
 
     if (dateMatch && timeMatch) {
-        const teacherMatch = text.match(/[|｜]\s*(\S+?)(?:老師)?(?:\n|$|\s)/);
-        const teacher = teacherMatch ? (teacherMatch[1].includes('老師') ? teacherMatch[1] : teacherMatch[1] + '老師') : '以琳老師';
+const teacherMatch = text.match(/導師[|｜]\s*(\S+?)(?:老師)?(?:\n|$|\s)/);
+        const teacher = teacherMatch ? 
+            (teacherMatch[1].includes('老師') ? teacherMatch[1] : teacherMatch[1] + '老師') : 
+            '以琳老師'; // 若沒抓到則預設
         
         // 獲取當前系統的年份與月份
         const now = new Date();
