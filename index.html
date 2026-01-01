@@ -146,10 +146,18 @@
 </head>
 <body>
 
-<div style="margin-bottom: 20px; padding: 10px; background: #e6f7ff; border-radius: 8px; border: 1px solid #91d5ff;">
-    <strong>🔍 快速查詢課堂：</strong>
-    <input type="date" id="searchDate" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+<div style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px;">
+    <strong>🔍 快速查詢：</strong>
+    <input type="date" id="searchDate" style="padding: 5px;">
     <button onclick="checkDayEvents()" style="padding: 5px 15px; background: #1890ff; color: white; border: none; border-radius: 4px; cursor: pointer;">列出課堂</button>
+    
+    <div id="resultArea" style="margin-top: 15px; display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: bold; color: #075e54;">當日清單：</span>
+            <button onclick="copyDailyList()" style="padding: 2px 10px; font-size: 12px; background: #25D366; color: white; border: none; border-radius: 4px; cursor: pointer;">複製清單</button>
+        </div>
+        <pre id="dailyListText" style="background: white; padding: 10px; border: 1px solid #eee; margin-top: 8px; font-family: inherit; white-space: pre-wrap; font-size: 14px;"></pre>
+    </div>
 </div>
   
 <div id="custom-menu" style="display:none; position:fixed; z-index:9999; background:white; border:1px solid #ccc; box-shadow: 2px 2px 10px rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden;">
@@ -655,42 +663,52 @@ document.getElementById('toggle-btn').onclick = function() {
     });
 }
 function checkDayEvents() {
-    // 1. 取得使用者選擇的日期
     var targetDate = document.getElementById('searchDate').value;
-    if (!targetDate) {
-        alert("請先選擇日期");
+    if (!targetDate) return alert("請選擇日期");
+
+    // 1. 取得事件
+    var allEvents = window.calendar.getEvents();
+    var dayEvents = allEvents.filter(function(ev) {
+        return ev.startStr.indexOf(targetDate) === 0;
+    });
+
+    var resultDiv = document.getElementById('resultArea');
+    var textP = document.getElementById('dailyListText');
+
+    if (dayEvents.length === 0) {
+        resultDiv.style.display = 'none';
+        alert(targetDate + " 沒有課堂紀錄。");
         return;
     }
 
-    // 2. 讓日曆跳轉到該日期 (視覺反饋)
-    calendar.gotoDate(targetDate);
-
-    // 3. 獲取該日所有事件
-    var allEvents = calendar.getEvents();
-    var dayEvents = allEvents.filter(function(event) {
-        // 格式化事件日期進行比對
-        return event.startStr.indexOf(targetDate) === 0;
+    // 2. 排序並組合文字
+    dayEvents.sort((a, b) => a.start - b.start);
+    var report = `📅 ${targetDate} 課堂總覽\n`;
+    report += `--------------------------\n`;
+    
+    dayEvents.forEach(function(ev) {
+        var startTime = ev.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
+        var endTime = ev.end ? ev.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}) : "";
+        var teacher = ev.extendedProps.teacher || "未指定";
+        var room = ev.getResources()[0] ? ev.getResources()[0].title : "未知教室";
+        
+        report += `⏰ ${startTime}-${endTime}\n👤 ${ev.title}\n👨‍🏫 導師：${teacher}\n📍 地點：${room}\n--------------------------\n`;
     });
 
-    // 4. 顯示結果
-    if (dayEvents.length === 0) {
-        alert(targetDate + " 當天沒有課堂紀錄。");
-    } else {
-        // 排序：按時間先後
-        dayEvents.sort((a, b) => a.start - b.start);
+    // 3. 顯示在網頁上
+    textP.innerText = report;
+    resultDiv.style.display = 'block';
+    
+    // 同步跳轉日曆視角
+    window.calendar.gotoDate(targetDate);
+}
 
-        var report = "📅 " + targetDate + " 課堂清單：\n\n";
-        dayEvents.forEach(function(ev) {
-            var startTime = ev.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
-            var room = ev.getResources()[0] ? ev.getResources()[0].title : "未指定教室";
-            var teacher = ev.extendedProps.teacher || "未指定導師";
-            
-            report += `⏰ ${startTime} | ${ev.title}\n   📍 ${room} (${teacher})\n------------------\n`;
-        });
-        
-        // 您可以選擇用 alert 彈出，或是印在網頁某處
-        alert(report);
-    }
+// 複製功能
+function copyDailyList() {
+    var text = document.getElementById('dailyListText').innerText;
+    navigator.clipboard.writeText(text).then(function() {
+        alert("清單已成功複製到剪貼簿！");
+    });
 }
     
 </script>
