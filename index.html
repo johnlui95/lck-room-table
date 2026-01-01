@@ -627,6 +627,27 @@ document.getElementById('toggle-btn').onclick = function() {
 
 // 💡 關鍵修正：確保這裡正確閉合 DOMContentLoaded
 }); 
+
+    function listDayEvents(targetDate) {
+    // 1. 獲取日曆上所有的 Event
+    var allEvents = calendar.getEvents(); 
+    
+    // 2. 篩選出符合日期的課堂
+    var dayEvents = allEvents.filter(function(event) {
+        return event.startStr.split('T')[0] === targetDate;
+    });
+
+    if (dayEvents.length === 0) {
+        console.log(targetDate + " 沒有課堂。");
+        return;
+    }
+
+    // 3. 排序並列出
+    console.log("--- " + targetDate + " 課堂清單 ---");
+    dayEvents.sort((a, b) => a.start - b.start).forEach(function(ev) {
+        console.log(`${ev.start.getHours()}:${ev.start.getMinutes().toString().padStart(2,'0')} - ${ev.title} (${ev.extendedProps.teacher || '無導師'})`);
+    });
+}
 </script>
 </body>
 </html>
