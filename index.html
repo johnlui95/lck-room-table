@@ -391,6 +391,9 @@ if (action === 'paste' && info) {
 document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('calendar');
 
+  calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'resourceTimeGridWeek',
+
 calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'resourceTimeGridWeek', 
         headerToolbar: {
@@ -669,52 +672,36 @@ document.getElementById('toggle-btn').onclick = function() {
 function checkDayEvents() {
     try {
         var targetDate = document.getElementById('searchDate').value;
-        if (!targetDate) {
-            alert("請先選擇日期！");
-            return;
-        }
+        if (!targetDate) return alert("請先選擇日期！");
 
-        // 偵測日曆變數是否存在
-        var myCalendar = window.calendar || (typeof calendar !== 'undefined' ? calendar : null);
-        
-        if (!myCalendar) {
-            alert("系統找不到日曆元件 (Calendar Instance Not Found)，請重新整理網頁再試。");
-            return;
-        }
-
-        // 跳轉日曆
-        myCalendar.gotoDate(targetDate);
-
-        // 獲取事件
-        var allEvents = myCalendar.getEvents();
-        var dayEvents = allEvents.filter(function(ev) {
-            return ev.startStr.indexOf(targetDate) === 0;
-        });
-
-        var resultDiv = document.getElementById('resultArea');
-        var textP = document.getElementById('dailyListText');
-
-        if (dayEvents.length === 0) {
-            if (resultDiv) resultDiv.style.display = 'none';
-            alert(targetDate + " 找不到任何課堂紀錄。");
-        } else {
-            dayEvents.sort((a, b) => a.start - b.start);
-            var report = `📅 ${targetDate} 課堂總覽\n--------------------------\n`;
-            dayEvents.forEach(function(ev) {
-                var st = ev.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
-                var t = ev.extendedProps.teacher || "未指定";
-                report += `⏰ ${st} | ${ev.title} (${t})\n`;
-            });
+        // 直接使用全域變數 calendar
+        if (calendar && typeof calendar.gotoDate === 'function') {
+            calendar.gotoDate(targetDate);
             
-            if (textP && resultDiv) {
+            var allEvents = calendar.getEvents();
+            var dayEvents = allEvents.filter(ev => ev.startStr.indexOf(targetDate) === 0);
+
+            var resultDiv = document.getElementById('resultArea');
+            var textP = document.getElementById('dailyListText');
+
+            if (dayEvents.length === 0) {
+                if (resultDiv) resultDiv.style.display = 'none';
+                alert(targetDate + " 沒有課堂紀錄。");
+            } else {
+                dayEvents.sort((a, b) => a.start - b.start);
+                var report = `📅 ${targetDate} 清單\n`;
+                dayEvents.forEach(ev => {
+                    var st = ev.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false});
+                    report += `⏰ ${st} | ${ev.title} (${ev.extendedProps.teacher || '無'})\n`;
+                });
                 textP.innerText = report;
                 resultDiv.style.display = 'block';
-            } else {
-                alert(report); // 如果沒找到結果區域，就用彈窗顯示
             }
+        } else {
+            alert("日曆載入中，請稍後。");
         }
     } catch (err) {
-        alert("程式執行出錯：" + err.message);
+        alert("錯誤: " + err.message);
     }
 }
 
