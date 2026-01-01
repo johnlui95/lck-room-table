@@ -268,24 +268,6 @@ if (action === 'paste' && info) {
             extendedProps: evData.extendedProps,
             backgroundColor: evData.backgroundColor
         });
-function syncToGoogleSheet(eventData) {
-    const scriptUrl = 'https://script.google.com/macros/s/AKfycbzUnrFdjQPGnHM4rQgLyVgLLUaGqo102lPUsfpkl9lwJbam-zpyz8a3M6cawZ9Nnosz-A/exec';
-    
-    fetch(scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors', // 避開跨網域問題
-        cache: 'no-cache',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            title: eventData.title,
-            start: eventData.start,
-            end: eventData.end,
-            resourceId: eventData.resourceId,
-            teacher: eventData.extendedProps.teacher
-        })
-    }).then(() => console.log('Google Sheet 同步成功'));
-}
-      
     });
 
     updateToCloud();
