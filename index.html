@@ -151,13 +151,13 @@
     <input type="date" id="searchDate" style="padding: 2px 5px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;">
     <button onclick="checkDayEvents()" style="padding: 3px 12px; background: #1890ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">列出課堂</button>
     
-    <div id="resultArea" style="margin-top: 15px; display: none;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-weight: bold; color: #075e54;">當日清單：</span>
-            <button onclick="copyDailyList()" style="padding: 2px 10px; font-size: 12px; background: #25D366; color: white; border: none; border-radius: 4px; cursor: pointer;">複製清單</button>
-        </div>
-        <pre id="dailyListText" style="background: white; padding: 10px; border: 1px solid #eee; margin-top: 8px; font-family: inherit; white-space: pre-wrap; font-size: 14px;"></pre>
+<div id="resultArea" style="margin-top: 5px; margin-bottom: 5px; display: none; background: #fff; padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <span style="font-weight: bold; font-size: 13px;">📋 當日課堂清單：</span>
+        <button onclick="copyDailyList()" style="padding: 2px 8px; font-size: 11px; background: #25D366; color: white; border: none; border-radius: 4px;">複製</button>
     </div>
+    <pre id="dailyListText" style="margin: 0; padding: 5px; background: #f9f9f9; border: 1px solid #eee; font-size: 12px; white-space: pre-wrap;"></pre>
+</div>
 </div>
   
 <div id="custom-menu" style="display:none; position:fixed; z-index:9999; background:white; border:1px solid #ccc; box-shadow: 2px 2px 10px rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden;">
